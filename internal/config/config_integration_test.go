@@ -1,6 +1,7 @@
 package config
 
 import (
+	"github.com/stretchr/testify/assert"
 	"os"
 	"path/filepath"
 	"testing"
@@ -39,18 +40,24 @@ func TestConfigIntegration(t *testing.T) {
 		config := loadConfig(t)
 
 		// Verify default values
-		assert(t, "mpv", config.Player.Type)
-		assert(t, "english", config.UI.TitleLanguage)
+		assert.Equal(t, "mpv", config.Player.Type)
+		assert.Equal(t, "english", config.UI.TitleLanguage)
+		assert.Equal(t, "info", config.Logging.Level)
+		assert.NotEmpty(t, config.Logging.FilePath)
 
 		// Verify file was created
 		if _, err := os.Stat(tmpConfigPath); os.IsNotExist(err) {
 			t.Errorf("Config file was not created at %s", tmpConfigPath)
 		}
+
+		// Load the file from disk to assert that the 'dynamic' configurations were not saved when the default config was written
+		savedConfig, _ := loadFromDisk(tmpConfigPath)
+		assert.Empty(t, savedConfig.Logging.FilePath)
 	})
 
 	// Test saving and loading custom values
 	t.Run("SaveAndLoadConfig", func(t *testing.T) {
-		setupTestConfig(t)
+		tmpConfigPath := setupTestConfig(t)
 		// Create a config with custom values
 		customConfig := &Config{
 			Auth: AuthConfig{
@@ -64,17 +71,23 @@ func TestConfigIntegration(t *testing.T) {
 			UI: UIConfig{
 				TitleLanguage: "romaji",
 			},
+			Logging: LoggingConfig{
+				Level:    "error",
+				FilePath: "/var/log/hisame.log",
+			},
 		}
 
-		saveConfig(t, customConfig)
+		saveConfig(t, customConfig, tmpConfigPath)
 		loadedConfig := loadConfig(t)
 
 		// Verify loaded values match what we saved
-		assert(t, "test-token", loadedConfig.Auth.Token)
-		assert(t, "custom", loadedConfig.Player.Type)
-		assert(t, "/usr/bin/vlc", loadedConfig.Player.Path)
-		assert(t, "--fullscreen", loadedConfig.Player.Args)
-		assert(t, "romaji", loadedConfig.UI.TitleLanguage)
+		assert.Equal(t, "test-token", loadedConfig.Auth.Token)
+		assert.Equal(t, "custom", loadedConfig.Player.Type)
+		assert.Equal(t, "/usr/bin/vlc", loadedConfig.Player.Path)
+		assert.Equal(t, "--fullscreen", loadedConfig.Player.Args)
+		assert.Equal(t, "romaji", loadedConfig.UI.TitleLanguage)
+		assert.Equal(t, "error", loadedConfig.Logging.Level)
+		assert.Equal(t, "/var/log/hisame.log", loadedConfig.Logging.FilePath)
 	})
 
 	// Test invalid YAML handling
@@ -100,14 +113,18 @@ func TestConfigIntegration(t *testing.T) {
 		setEnv(t, "HISAME_CONFIG_PLAYER_TYPE", "custom")
 		setEnv(t, "HISAME_CONFIG_PLAYER_PATH", "/vlc")
 		setEnv(t, "HISAME_CONFIG_PLAYER_ARGS", "--fullscreen")
+		setEnv(t, "HISAME_CONFIG_LOGGING_LEVEL", "warn")
+		setEnv(t, "HISAME_CONFIG_LOGGING_FILE_PATH", "/hisame.log")
 
 		config := loadConfig(t)
 
-		assert(t, "test-token", config.Auth.Token)
-		assert(t, "romaji", config.UI.TitleLanguage)
-		assert(t, "custom", config.Player.Type)
-		assert(t, "/vlc", config.Player.Path)
-		assert(t, "--fullscreen", config.Player.Args)
+		assert.Equal(t, "test-token", config.Auth.Token)
+		assert.Equal(t, "romaji", config.UI.TitleLanguage)
+		assert.Equal(t, "custom", config.Player.Type)
+		assert.Equal(t, "/vlc", config.Player.Path)
+		assert.Equal(t, "--fullscreen", config.Player.Args)
+		assert.Equal(t, "warn", config.Logging.Level)
+		assert.Equal(t, "/hisame.log", config.Logging.FilePath)
 
 		// Remove the HISAME_CONFIG_UI_TITLE_LANGUAGE env var, then reload the config.
 		// This ensures that the env var overrides were not persisted to disk.
@@ -115,15 +132,8 @@ func TestConfigIntegration(t *testing.T) {
 
 		config = loadConfig(t)
 
-		assert(t, "english", config.UI.TitleLanguage)
+		assert.Equal(t, "english", config.UI.TitleLanguage)
 	})
-}
-
-func assert[T comparable](t *testing.T, expected T, actual T) {
-	t.Helper()
-	if expected != actual {
-		t.Errorf("Expected %v, got %v", expected, actual)
-	}
 }
 
 func setEnv(t *testing.T, key, value string) {
@@ -142,9 +152,9 @@ func unsetEnv(t *testing.T, key string) {
 	}
 }
 
-func saveConfig(t *testing.T, config *Config) {
+func saveConfig(t *testing.T, config *Config, configPath string) {
 	t.Helper()
-	if err := config.Save(); err != nil {
+	if err := save(config, configPath); err != nil {
 		t.Fatalf("Failed to save config: %v", err)
 	}
 }

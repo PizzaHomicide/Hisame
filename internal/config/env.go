@@ -43,12 +43,21 @@ var supportedEnvVars = []envVar{
 		desc:  "Sets the path to a video player argument.  Default: None",
 		apply: func(c *Config, s string) { c.Player.Args = s },
 	},
+	{
+		name:  "HISAME_CONFIG_LOGGING_LEVEL",
+		desc:  "Sets the logging level.  One of: debug, info, warn, error.  Default: info",
+		apply: func(c *Config, s string) { c.Logging.Level = s },
+	},
+	{
+		name:  "HISAME_CONFIG_LOGGING_FILE_PATH",
+		desc:  "Sets the logging file path.  Default: OS-specific",
+		apply: func(c *Config, s string) { c.Logging.FilePath = s },
+	},
 }
 
 func applyEnvVarOverrides(c *Config) {
 	for _, envVar := range supportedEnvVars {
 		if value := os.Getenv(envVar.name); value != "" {
-			// TODO:  Logging here to inform of override
 			envVar.apply(c, value)
 		}
 	}
