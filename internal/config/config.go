@@ -12,33 +12,33 @@ import (
 
 // Config represents the application configuration
 type Config struct {
-	Auth    AuthConfig    `yaml:"auth"`
-	Player  PlayerConfig  `yaml:"player"`
-	UI      UIConfig      `yaml:"ui"`
-	Logging LoggingConfig `yaml:"logging"`
+	Auth    AuthConfig    `yaml:"auth,omitempty"`
+	Player  PlayerConfig  `yaml:"player,omitempty"`
+	UI      UIConfig      `yaml:"ui,omitempty"`
+	Logging LoggingConfig `yaml:"logging,omitempty"`
 }
 
 // AuthConfig contains authentication settings
 type AuthConfig struct {
-	Token string `yaml:"token,omitempty"`
+	Token string `yaml:"token,omitempty,omitempty"`
 }
 
 // PlayerConfig contains media player settings
 type PlayerConfig struct {
-	Type string `yaml:"type"` // "mpv", "custom"
-	Path string `yaml:"path"`
-	Args string `yaml:"args"`
+	Type string `yaml:"type,omitempty"` // "mpv", "custom"
+	Path string `yaml:"path,omitempty"`
+	Args string `yaml:"args,omitempty"`
 }
 
 // UIConfig contains UI display preferences
 type UIConfig struct {
-	TitleLanguage string `yaml:"title_language"`
+	TitleLanguage string `yaml:"title_language,omitempty"`
 }
 
 // LoggingConfig contains log related settings
 type LoggingConfig struct {
-	Level    string `yaml:"level"`
-	FilePath string `yaml:"file_path"`
+	Level    string `yaml:"level,omitempty"`
+	FilePath string `yaml:"file_path,omitempty"`
 }
 
 // Load builds a configuration struct from multiple sources using these steps:
