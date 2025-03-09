@@ -4,6 +4,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -25,7 +26,7 @@ func setupTestConfig(t *testing.T) string {
 	setEnv(t, "HISAME_CONFIG_PATH", tmpConfigPath)
 
 	t.Cleanup(func() {
-		unsetEnv(t, "HISAME_CONFIG_PATH")
+		cleanupEnvVars(t)
 	})
 
 	return tmpConfigPath
@@ -184,4 +185,15 @@ func loadConfig(t *testing.T) *Config {
 		t.Fatalf("Loading of config failed: %v", err)
 	}
 	return config
+}
+
+// Removes any env vars with the HISAME_CONFIG prefix to ensure test isolation
+func cleanupEnvVars(t *testing.T) {
+	t.Helper()
+
+	for _, envVar := range os.Environ() {
+		if key := strings.Split(envVar, "=")[0]; strings.HasPrefix(key, "HISAME_CONFIG") {
+			unsetEnv(t, key)
+		}
+	}
 }
