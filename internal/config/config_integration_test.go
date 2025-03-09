@@ -134,6 +134,24 @@ func TestConfigIntegration(t *testing.T) {
 
 		assert.Equal(t, "english", config.UI.TitleLanguage)
 	})
+
+	t.Run("ModifyConfig", func(t *testing.T) {
+		setupTestConfig(t)
+		config := loadConfig(t)
+
+		assert.Equal(t, "mpv", config.Player.Type)
+
+		err := UpdateConfig(func(config *Config) {
+			config.Player.Type = "custom"
+		})
+		if err != nil {
+			t.Fatalf("Failed to update config: %v", err)
+		}
+
+		// Reload the config and ensure it has the new value
+		config = loadConfig(t)
+		assert.Equal(t, "custom", config.Player.Type)
+	})
 }
 
 func setEnv(t *testing.T, key, value string) {
