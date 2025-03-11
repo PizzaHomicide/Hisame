@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/PizzaHomicide/hisame/internal/config"
 	"github.com/PizzaHomicide/hisame/internal/log"
+	"github.com/PizzaHomicide/hisame/internal/ui/tui"
 	"os"
 )
 
@@ -31,12 +32,12 @@ func main() {
 	// Set the default global logger
 	log.SetDefaultLogger(logger)
 
-	log.Info("Hisame starting", "version", "0.0.1")
+	log.Info("Starting up Hisame", "version", "0.0.1")
 
-	log.Debug("This is a sample hisame debug log", "test", true)
-	log.Info("This is a sample hisame info log", "test", true)
-	log.Warn("This is a sample hisame warning log", "test", true)
-	log.Error("This is a sample hisame error log", "test", true)
+	if err := tui.Run(cfg); err != nil {
+		log.Error("Unhandled error while running TUI", "error", err)
+		os.Exit(1)
+	}
 
 	log.Info("Hisame shutting down.  Goodbye!")
 }
