@@ -5,6 +5,7 @@ import (
 )
 
 var (
+	// Text styles
 	Title = lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("#FAFAFA")).
@@ -14,15 +15,12 @@ var (
 	Info = lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#DEDEDE"))
 
-	Instruction = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#89CFF0"))
-
 	Url = lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#43BF6D")).
 		Underline(true)
 )
 
-// Header creates a styled header
+// Layout helpers
 func Header(width int, title string) string {
 	return Title.
 		Width(width).
@@ -30,11 +28,12 @@ func Header(width int, title string) string {
 		Render(title)
 }
 
-// ContentBox creates a content area with optional padding
 func ContentBox(width int, content string, padding int) string {
 	return lipgloss.NewStyle().
 		Width(width).
 		Padding(padding).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#555555")).
 		Render(content)
 }
 
