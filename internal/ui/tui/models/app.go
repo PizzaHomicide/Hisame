@@ -4,6 +4,7 @@ import (
 	"github.com/PizzaHomicide/hisame/internal/config"
 	"github.com/PizzaHomicide/hisame/internal/log"
 	tea "github.com/charmbracelet/bubbletea"
+	"os"
 )
 
 // AppModel is the main application model that coordinates all child models.  It is the high level wrapper.
@@ -54,8 +55,18 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c":
 			log.Info("Quit command received.  Shutting down...")
 			return m, tea.Quit
+		case "ctrl+l":
+			log.Info("Logging out.  Cleaning up token from config file...")
+			m.config.Auth.Token = ""
+			config.UpdateConfig(func(conf *config.Config) {
+				conf.Auth.Token = ""
+			})
+			// Throw back to login screen
+			m.authModel.Reset()
+			m.activeView = ViewAuth
+			return m, nil
 		case "ctrl+h":
-			log.Debug("Opening help panel")
+			log.Debug("Help requested TODO")
 			// TODO: Help panel
 			return m, nil
 		}
@@ -63,6 +74,11 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		// Propagate new window size to all views so they are aware and can render correctly
+		if m.authModel != nil {
+			m.authModel.width = msg.Width
+			m.authModel.height = msg.Height
+		}
 		log.Debug("Window size changed", "width", m.width, "height", m.height)
 	}
 
@@ -87,12 +103,25 @@ func (m AppModel) View() string {
 // updateAuthView delegates message processing to
 func (m AppModel) updateAuthView(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Any messages that require orchestration/view changing specific to the auth view
-	switch msg.(type) {
+	switch typedMsg := msg.(type) {
 	case AuthCompletedMsg:
 		log.Info("Authentication successful")
+		m.config.Auth.Token = typedMsg.Token
+		err := config.UpdateConfig(func(conf *config.Config) {
+			conf.Auth.Token = typedMsg.Token
+		})
+		if err != nil {
+			log.Warn("Error saving auth token to config.  Will need to reauthenticate when Hisame opens next", "error", err)
+		}
+		m.authModel.Reset()
 		m.activeView = ViewAnimeList
 		// TODO: Initialise/load data from AniList
 		return m, nil
+	case AuthFailedMsg:
+		log.Error("Authentication failed", "error", typedMsg.Error)
+		m.authModel.Reset()
+		// TODO:  Add better error handling when auth fails
+		os.Exit(1)
 	}
 
 	// Delegate other messages to the model

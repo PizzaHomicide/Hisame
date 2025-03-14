@@ -1,20 +1,23 @@
 package models
 
 import (
+	"github.com/PizzaHomicide/hisame/internal/auth"
 	"github.com/PizzaHomicide/hisame/internal/log"
 	"github.com/PizzaHomicide/hisame/internal/ui/tui/styles"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"time"
 )
 
 type AuthModel struct {
 	width, height  int
 	authInProgress bool
+	authUrl        string
 }
 
 func NewAuthModel() *AuthModel {
-	return &AuthModel{}
+	return &AuthModel{
+		authUrl: "Authentication URL not available",
+	}
 }
 
 func (m *AuthModel) Init() tea.Cmd {
@@ -32,12 +35,32 @@ func (m *AuthModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "l":
 			log.Info("Start login..")
 			m.authInProgress = true
-			// TODO: Login process
-			return m, mockLogin()
+			return m, m.startAuth()
 		}
 	}
 
 	return m, nil
+}
+
+// startAuth begins the authentication process
+func (m *AuthModel) startAuth() tea.Cmd {
+	authManager := auth.NewAuth()
+	m.authUrl = authManager.LoginURL.String()
+	return func() tea.Msg {
+		result := authManager.DoAuth()
+
+		if result.Error != nil {
+			return AuthFailedMsg{Error: result.Error.Error()}
+		}
+
+		return AuthCompletedMsg{Token: result.Token}
+	}
+}
+
+// Reset resets the auth model so it is ready to do a fresh login if necessary
+func (m *AuthModel) Reset() {
+	m.authInProgress = false
+	m.authUrl = ""
 }
 
 func (m *AuthModel) View() string {
@@ -86,22 +109,7 @@ func (m *AuthModel) authInProgressContent(contentWidth int) string {
 		styles.Info.Render("If your browser didn't open automatically, please visit the following URL:"))
 	content += "\n\n"
 
-	content += styles.CenteredText(contentWidth-2, styles.Url.Render("https://anilist.co/"))
+	content += styles.CenteredText(contentWidth-2, styles.Url.Render(m.authUrl))
 
 	return content
-}
-
-// mockLogin 'simulates' an async login process by running it in a goroutine, waiting a few seconds, and completing
-// It exists only to aid development of the TUI and is to be removed when the real login process is implemented.
-func mockLogin() tea.Cmd {
-	return func() tea.Msg {
-		// Simulate delay
-		log.Info("Authenticating to AniList...")
-		time.Sleep(15 * time.Second)
-		log.Info("Login successful.  Token received")
-
-		return AuthCompletedMsg{
-			Token: "foobar",
-		}
-	}
 }
