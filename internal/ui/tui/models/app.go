@@ -10,11 +10,13 @@ import (
 // AppModel is the main application model that coordinates all child models.  It is the high level wrapper.
 type AppModel struct {
 	config        *config.Config
-	activeView    View
+	activeView    View  // Track the current active 'main view'
+	activeModal   Modal // Track the current active 'modal overlay' if any
 	width, height int
 
 	// Models used for various views
 	authModel *AuthModel
+	helpModel *HelpModel
 }
 
 // NewAppModel creates a new instance of the main application model
@@ -29,9 +31,11 @@ func NewAppModel(cfg *config.Config) AppModel {
 		initialView = ViewAuth
 	}
 	return AppModel{
-		config:     cfg,
-		activeView: initialView,
-		authModel:  NewAuthModel(),
+		config:      cfg,
+		activeView:  initialView,
+		activeModal: ModalNone,
+		authModel:   NewAuthModel(),
+		helpModel:   NewHelpModel(),
 	}
 }
 
@@ -66,20 +70,31 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.activeView = ViewAuth
 			return m, nil
 		case "ctrl+h":
-			log.Debug("Help requested TODO")
-			// TODO: Help panel
+			log.Debug("Help requested", "active_view", m.activeView)
+			// Disable/toggle modal if one already active
+			if m.activeModal != ModalNone {
+				m.activeModal = ModalNone
+			} else {
+				m.activeModal = ModalHelp
+			}
 			return m, nil
+
+		// Handle closing modal when esc is pressed if any is active
+		case "esc":
+			if m.activeModal != ModalNone {
+				m.activeModal = ModalNone
+				return m, nil
+			}
 		}
 
 	case tea.WindowSizeMsg:
+		log.Debug("Window size changed", "width", m.width, "height", m.height)
 		m.width = msg.Width
 		m.height = msg.Height
+
 		// Propagate new window size to all views so they are aware and can render correctly
-		if m.authModel != nil {
-			m.authModel.width = msg.Width
-			m.authModel.height = msg.Height
-		}
-		log.Debug("Window size changed", "width", m.width, "height", m.height)
+		m.authModel.Resize(msg.Width, msg.Height)
+		m.helpModel.Resize(msg.Width, msg.Height)
 	}
 
 	// Delegate message processing to the active view
@@ -92,6 +107,13 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m AppModel) View() string {
+	// If there is an active modal it takes presedence
+	switch m.activeModal {
+	case ModalHelp:
+		return m.helpModel.View(m.activeView)
+	}
+
+	// Else display the actual view
 	switch m.activeView {
 	case ViewAuth:
 		return m.authModel.View()

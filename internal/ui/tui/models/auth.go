@@ -8,6 +8,20 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+const (
+	// HorizontalPadding - padding on each side of content
+	HorizontalPadding = 2
+
+	// MinWidth Minimum usable width for the UI
+	MinWidth = 35
+
+	// MinHeight Minimum usable height for the UI
+	MinHeight = 12
+
+	// MaxContentWidth Maximum content width
+	MaxContentWidth = 120
+)
+
 type AuthModel struct {
 	width, height  int
 	authInProgress bool
@@ -26,10 +40,6 @@ func (m *AuthModel) Init() tea.Cmd {
 
 func (m *AuthModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
-
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "l":
@@ -48,6 +58,7 @@ func (m *AuthModel) startAuth() tea.Cmd {
 	m.authUrl = authManager.LoginURL.String()
 	return func() tea.Msg {
 		result := authManager.DoAuth()
+		m.authInProgress = false
 
 		if result.Error != nil {
 			return AuthFailedMsg{Error: result.Error.Error()}
@@ -64,7 +75,15 @@ func (m *AuthModel) Reset() {
 }
 
 func (m *AuthModel) View() string {
-	contentWidth := min(m.width, 120)
+	// Reserve a few pixels for borders/padding
+	availableWidth := m.width - HorizontalPadding
+
+	contentWidth := min(availableWidth, MaxContentWidth)
+
+	// If terminal is extremely small, show a simplified view
+	if m.width < MinWidth || m.height < MinHeight {
+		return "Terminal too small\nResize or press ctrl+c"
+	}
 
 	header := styles.Header(contentWidth, "Hisame")
 
@@ -86,30 +105,36 @@ func (m *AuthModel) View() string {
 }
 
 func (m *AuthModel) initialContent(contentWidth int) string {
-	content := styles.CenteredText(contentWidth-2,
+	content := styles.CenteredText(contentWidth-HorizontalPadding,
 		styles.Info.Render("You need to authenticate with AniList to use Hisame."))
 	content += "\n\n"
 
-	content += styles.CenteredText(contentWidth-2,
+	content += styles.CenteredText(contentWidth-HorizontalPadding,
 		styles.Info.Render("When you press 'l' a browser will open to authenticate with Anilist")) + "\n"
-	content += styles.CenteredText(contentWidth-2,
+	content += styles.CenteredText(contentWidth-HorizontalPadding,
 		styles.Info.Render("After seeing the Hisame login success screen in your browser, continue in this application")) + "\n\n"
 
-	content += styles.CenteredText(contentWidth-2,
+	content += styles.CenteredText(contentWidth-HorizontalPadding,
 		styles.Info.Render("Press 'l' to login or 'ctrl+c' to quit."))
 
 	return content
 }
 
 func (m *AuthModel) authInProgressContent(contentWidth int) string {
-	content := styles.CenteredText(contentWidth-2, styles.Info.Render("Authenticating to AniList..."))
+	content := styles.CenteredText(contentWidth-HorizontalPadding, styles.Info.Render("Authenticating to AniList..."))
 	content += "\n\n"
 
-	content += styles.CenteredText(contentWidth-2,
+	content += styles.CenteredText(contentWidth-HorizontalPadding,
 		styles.Info.Render("If your browser didn't open automatically, please visit the following URL:"))
 	content += "\n\n"
 
-	content += styles.CenteredText(contentWidth-2, styles.Url.Render(m.authUrl))
+	content += styles.CenteredText(contentWidth-HorizontalPadding, styles.Url.Render(m.authUrl))
 
 	return content
+}
+
+// Resize updates the dimensions of the auth model
+func (m *AuthModel) Resize(width, height int) {
+	m.width = width
+	m.height = height
 }
