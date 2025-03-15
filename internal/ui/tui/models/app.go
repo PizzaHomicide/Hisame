@@ -3,6 +3,8 @@ package models
 import (
 	"github.com/PizzaHomicide/hisame/internal/config"
 	"github.com/PizzaHomicide/hisame/internal/log"
+	"github.com/PizzaHomicide/hisame/internal/repository/anilist"
+	"github.com/PizzaHomicide/hisame/internal/service"
 	tea "github.com/charmbracelet/bubbletea"
 	"os"
 )
@@ -17,25 +19,39 @@ type AppModel struct {
 	// Models used for various views
 	authModel *AuthModel
 	helpModel *HelpModel
+
+	// Services used for fetching and updating state
+	animeService *service.AnimeService
 }
 
 // NewAppModel creates a new instance of the main application model
 func NewAppModel(cfg *config.Config) AppModel {
 	var initialView View
+	var animeService *service.AnimeService
 
-	// TODO: Validation on the token.
 	if cfg.Auth.Token != "" {
-		// Skip the auth view
-		initialView = ViewAnimeList
+		log.Info("Token found in config file.  Testing it to see if still valid")
+		client, err := anilist.NewClient(cfg.Auth.Token)
+		if err != nil {
+			log.Warn("Failed to create anilist client with token from config.  Reauthentication required")
+			initialView = ViewAuth
+		} else {
+			// Client initialised correct, so we can bypass auth.
+			animeRepo := anilist.NewAnimeRepository(client)
+			animeService = service.NewAnimeService(animeRepo)
+			initialView = ViewAnimeList
+
+		}
 	} else {
 		initialView = ViewAuth
 	}
 	return AppModel{
-		config:      cfg,
-		activeView:  initialView,
-		activeModal: ModalNone,
-		authModel:   NewAuthModel(),
-		helpModel:   NewHelpModel(),
+		config:       cfg,
+		activeView:   initialView,
+		activeModal:  ModalNone,
+		authModel:    NewAuthModel(),
+		helpModel:    NewHelpModel(),
+		animeService: animeService,
 	}
 }
 
