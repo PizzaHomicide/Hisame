@@ -19,7 +19,9 @@ import (
 
 // AnimeFilterSet represents a collection of filters to apply to the anime list
 type AnimeFilterSet struct {
-	statusFilters []domain.MediaStatus // Empty slice means no status filter
+	statusFilters        []domain.MediaStatus // Empty slice means no status filter
+	hasAvailableEpisodes bool                 // Filter to only anime with aired but unwatched episodes
+	isFinishedAiring     bool                 // Filter to anime that have fully completed airing
 }
 
 // AnimeListModel handles displaying and interacting with the anime list
@@ -99,6 +101,14 @@ func (m *AnimeListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "1", "2", "3", "4", "5", "6":
 			// Toggle status filters based on number keys
 			m.toggleStatusFilter(msg.String())
+			m.applyFilters()
+			m.cursor = 0
+		case "a":
+			m.toggleHasNewEpisodesFilter()
+			m.applyFilters()
+			m.cursor = 0
+		case "f":
+			m.toggleIsFinishedAiringFilter()
 			m.applyFilters()
 			m.cursor = 0
 		case "enter":
@@ -181,6 +191,16 @@ func (m *AnimeListModel) toggleStatusFilter(key string) {
 	}
 }
 
+// toggleHasNewEpisodesFilter toggles the new episodes filter
+func (m *AnimeListModel) toggleHasNewEpisodesFilter() {
+	m.filters.hasAvailableEpisodes = !m.filters.hasAvailableEpisodes
+}
+
+// toggleIsFinishedAiringFilter toggles the completed airing filter
+func (m *AnimeListModel) toggleIsFinishedAiringFilter() {
+	m.filters.isFinishedAiring = !m.filters.isFinishedAiring
+}
+
 // View renders the anime list model
 func (m *AnimeListModel) View() string {
 	if m.loading {
@@ -202,10 +222,11 @@ func (m *AnimeListModel) View() string {
 
 	// Build the view
 	header := styles.Header(m.width, "Hisame - Anime List")
+	filterStatus := m.renderFilterStatus()
 	content := m.renderAnimeList()
 
 	// Layout the components
-	return fmt.Sprintf("%s\n\n%s", header, content)
+	return fmt.Sprintf("%s\n\n%s\n\n%s", header, filterStatus, content)
 }
 
 // Init initializes the model
@@ -218,8 +239,8 @@ func (m *AnimeListModel) Init() tea.Cmd {
 
 // applyFilters applies the current filters to the anime list
 func (m *AnimeListModel) applyFilters() {
-	// Start with an empty list
-	m.filteredAnime = []*domain.Anime{}
+	// Start with all anime that match status filters
+	statusFilteredAnime := []*domain.Anime{}
 
 	// Apply status filters
 	for _, anime := range m.allAnime {
@@ -237,6 +258,36 @@ func (m *AnimeListModel) applyFilters() {
 		}
 
 		if statusMatch {
+			statusFilteredAnime = append(statusFilteredAnime, anime)
+		}
+	}
+
+	// Apply additional filters if needed
+	m.filteredAnime = []*domain.Anime{}
+
+	for _, anime := range statusFilteredAnime {
+		includeAnime := true
+
+		// Filter for has new episodes if enabled
+		if m.filters.hasAvailableEpisodes {
+			// Check if there are unwatched available episodes
+			hasNewEps := anime.Episodes > 0 && anime.UserData.Progress < anime.Episodes
+			if !hasNewEps {
+				includeAnime = false
+			}
+		}
+
+		// Filter for completed airing if enabled
+		if m.filters.isFinishedAiring && includeAnime {
+			// Check if the anime has finished airing
+			log.Debug("Anime status..", "title", anime.Title.English, "status", anime.Status)
+			isComplete := anime.Status == "FINISHED"
+			if !isComplete {
+				includeAnime = false
+			}
+		}
+
+		if includeAnime {
 			m.filteredAnime = append(m.filteredAnime, anime)
 		}
 	}
@@ -326,7 +377,7 @@ func (m *AnimeListModel) renderAnimeList() string {
 	var listContent string
 
 	// Add column headers
-	headerText := fmt.Sprintf("%-3s %-50s %-10s", "Sts", "Title", "Progress")
+	headerText := fmt.Sprintf("%-3s %-50s %10s", "Sts", "Title", "Progress")
 	listContent += headerStyle.Render(headerText) + "\n"
 	//headerText := fmt.Sprintf("%-50s %-10s", "Title", "Progress")
 	//listContent += headerStyle.Render(headerText) + "\n"
@@ -417,7 +468,7 @@ func (m *AnimeListModel) formatAnimeListItem(anime *domain.Anime) string {
 	}
 
 	// Format with proper spacing
-	return fmt.Sprintf("%s %s %-10s", statusIndicator, paddedTitle, progress)
+	return fmt.Sprintf("%s %s %10s", statusIndicator, paddedTitle, progress)
 }
 
 // getSelectedAnime returns the currently selected anime or nil if none
@@ -429,10 +480,55 @@ func (m *AnimeListModel) getSelectedAnime() *domain.Anime {
 	return animeList[m.cursor]
 }
 
-// min returns the minimum of two integers
-func min(a, b int) int {
-	if a < b {
-		return a
+// renderFilterStatus returns a concise string representation of all active filters
+func (m *AnimeListModel) renderFilterStatus() string {
+	// Status filters
+	statusFilters := []struct {
+		status    domain.MediaStatus
+		indicator string
+	}{
+		{domain.StatusCurrent, "W"},
+		{domain.StatusPlanning, "P"},
+		{domain.StatusCompleted, "C"},
+		{domain.StatusDropped, "D"},
+		{domain.StatusPaused, "H"},
+		{domain.StatusRepeating, "R"},
 	}
-	return b
+
+	// Create status filter indicators
+	var statusIndicators []string
+	for _, s := range statusFilters {
+		// Check if this status is in the active filters
+		isActive := false
+		for _, activeStatus := range m.filters.statusFilters {
+			if activeStatus == s.status {
+				isActive = true
+				break
+			}
+		}
+
+		// Format the indicator based on active status
+		if isActive {
+			statusIndicators = append(statusIndicators, fmt.Sprintf("[%s]", s.indicator))
+		} else {
+			statusIndicators = append(statusIndicators, "[-]")
+		}
+	}
+
+	episodeFilters := fmt.Sprintf("| Episodes -> [%s] [%s]",
+		conditionalIndicator(m.filters.hasAvailableEpisodes, "A", "-"),
+		conditionalIndicator(m.filters.isFinishedAiring, "F", "-"))
+
+	// Join all filter sections
+	filterLine := " Status -> " + strings.Join(statusIndicators, " ") + " " + episodeFilters
+	filterPrefix := styles.Title.Render("Filters:")
+	return filterPrefix + styles.FilterStatus.Render(filterLine)
+}
+
+// Helper function to return the appropriate indicator based on a condition
+func conditionalIndicator(condition bool, activeChar, inactiveChar string) string {
+	if condition {
+		return activeChar
+	}
+	return inactiveChar
 }

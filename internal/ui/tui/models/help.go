@@ -97,8 +97,10 @@ TODO - this is the auth view help
 * 4: Toggle Dropped filter
 * 5: Toggle Paused filter
 * 6: Toggle Repeating filter
+* a: Toggle available episodes filter
+* f: Toggle finished airing filter
 
-## Status Indicators
+## Filter Indicators
 
 * [W]: Watching
 * [P]: Planning
@@ -106,6 +108,8 @@ TODO - this is the auth view help
 * [D]: Dropped
 * [H]: Paused (On Hold)
 * [R]: Repeating
+* [A]: Available Episodes
+* [F]: Finished Airing
 `
 
 	default:

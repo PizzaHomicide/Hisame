@@ -18,6 +18,10 @@ var (
 	Url = lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#43BF6D")).
 		Underline(true)
+
+	FilterStatus = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#CCCCCC")).
+			Padding(0, 2)
 )
 
 // Layout helpers
