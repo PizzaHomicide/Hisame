@@ -51,15 +51,33 @@ type UserAnimeData struct {
 	Notes     string
 }
 
+// Preferred returns the anime title in the user's preferred language.
+// It follows a fallback order if the preferred title format is unavailable:
+//   - For "english" preference: English → Romaji → Native
+//   - For "romaji" preference: Romaji → English → Native
+//   - For "native" preference: Native → Romaji → English
+//
+// It will return an empty string only if all title formats are empty.
 func (at AnimeTitle) Preferred(preference string) string {
 	switch preference {
 	case "romaji":
-		return at.Romaji
+		return getFirstNonEmpty(at.Romaji, at.English, at.Native)
 	case "english":
-		return at.English
+		return getFirstNonEmpty(at.English, at.Romaji, at.Native)
 	case "native":
-		return at.Native
-	default:
-		return at.English
+		return getFirstNonEmpty(at.Native, at.Romaji, at.English)
+	default: // Default to English preference if unspecified
+		return getFirstNonEmpty(at.English, at.Romaji, at.Native)
 	}
+}
+
+// getFirstNonEmpty returns the first non-empty string from the provided arguments
+// or an empty string if all arguments are empty
+func getFirstNonEmpty(strings ...string) string {
+	for _, s := range strings {
+		if s != "" {
+			return s
+		}
+	}
+	return ""
 }

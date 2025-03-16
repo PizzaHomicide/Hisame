@@ -96,6 +96,16 @@ TODO - this is the auth view help
 * 3: Toggle Completed filter
 * 4: Toggle Dropped filter
 * 5: Toggle Paused filter
+* 6: Toggle Repeating filter
+
+## Status Indicators
+
+* [W]: Watching
+* [P]: Planning
+* [C]: Completed
+* [D]: Dropped
+* [H]: Paused (On Hold)
+* [R]: Repeating
 `
 
 	default:

@@ -96,7 +96,7 @@ func (m *AnimeListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(m.filteredAnime) > 0 && m.cursor < len(m.filteredAnime)-1 {
 				m.cursor++
 			}
-		case "1", "2", "3", "4", "5":
+		case "1", "2", "3", "4", "5", "6":
 			// Toggle status filters based on number keys
 			m.toggleStatusFilter(msg.String())
 			m.applyFilters()
@@ -152,6 +152,8 @@ func (m *AnimeListModel) toggleStatusFilter(key string) {
 		status = domain.StatusDropped
 	case "5":
 		status = domain.StatusPaused
+	case "6":
+		status = domain.StatusRepeating
 	default:
 		return
 	}
@@ -324,8 +326,10 @@ func (m *AnimeListModel) renderAnimeList() string {
 	var listContent string
 
 	// Add column headers
-	headerText := fmt.Sprintf("%-50s %-10s", "Title", "Progress")
+	headerText := fmt.Sprintf("%-3s %-50s %-10s", "Sts", "Title", "Progress")
 	listContent += headerStyle.Render(headerText) + "\n"
+	//headerText := fmt.Sprintf("%-50s %-10s", "Title", "Progress")
+	//listContent += headerStyle.Render(headerText) + "\n"
 
 	// Add a separator line
 	separatorLine := strings.Repeat("─", m.width-6) // Adjust width to fit inside the box
@@ -393,8 +397,27 @@ func (m *AnimeListModel) formatAnimeListItem(anime *domain.Anime) string {
 		}
 	}
 
+	// Get status indicator
+	statusIndicator := "[?]"
+	if anime.UserData != nil {
+		switch anime.UserData.Status {
+		case domain.StatusCurrent:
+			statusIndicator = "[W]"
+		case domain.StatusPlanning:
+			statusIndicator = "[P]"
+		case domain.StatusCompleted:
+			statusIndicator = "[C]"
+		case domain.StatusDropped:
+			statusIndicator = "[D]"
+		case domain.StatusPaused:
+			statusIndicator = "[H]"
+		case domain.StatusRepeating:
+			statusIndicator = "[R]"
+		}
+	}
+
 	// Format with proper spacing
-	return fmt.Sprintf("%s %-10s", paddedTitle, progress)
+	return fmt.Sprintf("%s %s %-10s", statusIndicator, paddedTitle, progress)
 }
 
 // getSelectedAnime returns the currently selected anime or nil if none
