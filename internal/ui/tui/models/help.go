@@ -99,6 +99,12 @@ TODO - this is the auth view help
 * 6: Toggle Repeating filter
 * a: Toggle available episodes filter
 * f: Toggle finished airing filter
+* Ctrl+f: Search anime titles
+
+## Search Mode
+
+* Enter: Apply search query
+* ESC: Cancel search
 
 ## Filter Indicators
 

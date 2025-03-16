@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/PizzaHomicide/hisame/internal/config"
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/mattn/go-runewidth"
 	"strings"
 	"time"
@@ -22,6 +23,7 @@ type AnimeFilterSet struct {
 	statusFilters        []domain.MediaStatus // Empty slice means no status filter
 	hasAvailableEpisodes bool                 // Filter to only anime with aired but unwatched episodes
 	isFinishedAiring     bool                 // Filter to anime that have fully completed airing
+	searchQuery          string               // Fuzzy search query to match titles against
 }
 
 // AnimeListModel handles displaying and interacting with the anime list
@@ -36,6 +38,8 @@ type AnimeListModel struct {
 	cursor        int
 	allAnime      []*domain.Anime // All anime from the service
 	filteredAnime []*domain.Anime // Anime after applying filters
+	searchInput   textinput.Model
+	searchMode    bool // Whether we're in search input mode
 }
 
 // NewAnimeListModel creates a new anime list model
@@ -49,6 +53,11 @@ func NewAnimeListModel(cfg *config.Config, animeService *service.AnimeService) *
 		statusFilters: []domain.MediaStatus{domain.StatusCurrent},
 	}
 
+	ti := textinput.New()
+	ti.Placeholder = "Search anime..."
+	ti.Width = 30
+	ti.Focus()
+
 	return &AnimeListModel{
 		config:        cfg,
 		animeService:  animeService,
@@ -58,6 +67,8 @@ func NewAnimeListModel(cfg *config.Config, animeService *service.AnimeService) *
 		cursor:        0,
 		allAnime:      []*domain.Anime{},
 		filteredAnime: []*domain.Anime{},
+		searchInput:   ti,
+		searchMode:    false,
 	}
 }
 
@@ -89,6 +100,32 @@ func (m *AnimeListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		// If in search mode, handle input differently
+		if m.searchMode {
+			switch msg.String() {
+			case "esc":
+				// Clear query
+				log.Debug("Clearing search query")
+				m.filters.searchQuery = ""
+				m.searchInput.SetValue("")
+				m.searchMode = false
+				m.applyFilters()
+				return m, nil
+			case "enter":
+				// Apply search
+				log.Debug("Setting search query", "query", m.searchInput.Value())
+				m.filters.searchQuery = m.searchInput.Value()
+				m.searchMode = false
+				m.applyFilters()
+				return m, nil
+			}
+
+			// Let the text input handle other keys
+			var cmd tea.Cmd
+			m.searchInput, cmd = m.searchInput.Update(msg)
+			return m, cmd
+		}
+
 		switch msg.String() {
 		case "up", "k":
 			if m.cursor > 0 {
@@ -111,6 +148,10 @@ func (m *AnimeListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.toggleIsFinishedAiringFilter()
 			m.applyFilters()
 			m.cursor = 0
+		case "ctrl+f":
+			m.searchMode = true
+			m.searchInput.Focus()
+			return m, nil
 		case "enter":
 			// TODO: Implement view detail of selected anime
 			log.Info("View anime detail", "title", m.getSelectedAnime().Title.English, "id", m.getSelectedAnime().ID)
@@ -225,6 +266,12 @@ func (m *AnimeListModel) View() string {
 	filterStatus := m.renderFilterStatus()
 	content := m.renderAnimeList()
 
+	if m.searchMode {
+		// Show search input at the top of the content
+		searchPrompt := styles.Title.Render("Search: ") + m.searchInput.View()
+		content = lipgloss.JoinVertical(lipgloss.Left, searchPrompt, content)
+	}
+
 	// Layout the components
 	return fmt.Sprintf("%s\n\n%s\n\n%s", header, filterStatus, content)
 }
@@ -283,6 +330,17 @@ func (m *AnimeListModel) applyFilters() {
 			log.Debug("Anime status..", "title", anime.Title.English, "status", anime.Status)
 			isComplete := anime.Status == "FINISHED"
 			if !isComplete {
+				includeAnime = false
+			}
+		}
+
+		// Filter on title search query
+		if m.filters.searchQuery != "" && includeAnime {
+			query := strings.ToLower(m.filters.searchQuery)
+
+			// Check only the current anime being processed
+			title := strings.ToLower(anime.Title.Preferred(m.config.UI.TitleLanguage))
+			if !strings.Contains(title, query) {
 				includeAnime = false
 			}
 		}
@@ -519,8 +577,13 @@ func (m *AnimeListModel) renderFilterStatus() string {
 		conditionalIndicator(m.filters.hasAvailableEpisodes, "A", "-"),
 		conditionalIndicator(m.filters.isFinishedAiring, "F", "-"))
 
+	searchFilter := ""
+	if m.filters.searchQuery != "" {
+		searchFilter = fmt.Sprintf(" | Search: \"%s\"", m.filters.searchQuery)
+	}
+
 	// Join all filter sections
-	filterLine := " Status -> " + strings.Join(statusIndicators, " ") + " " + episodeFilters
+	filterLine := " Status -> " + strings.Join(statusIndicators, " ") + " " + episodeFilters + " " + searchFilter
 	filterPrefix := styles.Title.Render("Filters:")
 	return filterPrefix + styles.FilterStatus.Render(filterLine)
 }
