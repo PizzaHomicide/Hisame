@@ -50,3 +50,16 @@ type UserAnimeData struct {
 	EndDate   string
 	Notes     string
 }
+
+func (at AnimeTitle) Preferred(preference string) string {
+	switch preference {
+	case "romaji":
+		return at.Romaji
+	case "english":
+		return at.English
+	case "native":
+		return at.Native
+	default:
+		return at.English
+	}
+}

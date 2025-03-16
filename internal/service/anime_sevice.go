@@ -18,6 +18,10 @@ func NewAnimeService(repo domain.AnimeRepository) *AnimeService {
 	}
 }
 
+func (s *AnimeService) GetAnimeList() []*domain.Anime {
+	return s.animeList
+}
+
 // LoadAnimeList fetches the complete anime list from the repository
 func (s *AnimeService) LoadAnimeList(ctx context.Context) error {
 	list, err := s.repo.GetAllAnimeList(ctx)

@@ -6,7 +6,6 @@ import (
 	"github.com/PizzaHomicide/hisame/internal/repository/anilist"
 	"github.com/PizzaHomicide/hisame/internal/service"
 	tea "github.com/charmbracelet/bubbletea"
-	"os"
 )
 
 // AppModel is the main application model that coordinates all child models.  It is the high level wrapper.
@@ -17,8 +16,9 @@ type AppModel struct {
 	width, height int
 
 	// Models used for various views
-	authModel *AuthModel
-	helpModel *HelpModel
+	authModel      *AuthModel
+	animeListModel *AnimeListModel
+	helpModel      *HelpModel
 
 	// Services used for fetching and updating state
 	animeService *service.AnimeService
@@ -46,12 +46,13 @@ func NewAppModel(cfg *config.Config) AppModel {
 		initialView = ViewAuth
 	}
 	return AppModel{
-		config:       cfg,
-		activeView:   initialView,
-		activeModal:  ModalNone,
-		authModel:    NewAuthModel(),
-		helpModel:    NewHelpModel(),
-		animeService: animeService,
+		config:         cfg,
+		activeView:     initialView,
+		activeModal:    ModalNone,
+		authModel:      NewAuthModel(),
+		animeListModel: NewAnimeListModel(cfg, animeService),
+		helpModel:      NewHelpModel(),
+		animeService:   animeService,
 	}
 }
 
@@ -60,8 +61,8 @@ func (m AppModel) Init() tea.Cmd {
 
 	// If starting application on anime list view, load the anime now
 	if m.activeView == ViewAnimeList {
-		log.Debug("TODO:  Load anime list")
-		return nil
+		log.Debug("Existing auth detected.  Loading anime list immediately")
+		return m.animeListModel.Init()
 	}
 
 	return nil
@@ -104,19 +105,22 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case tea.WindowSizeMsg:
-		log.Debug("Window size changed", "width", m.width, "height", m.height)
+		log.Debug("Window size changed", "old_width", m.width, "new_width", msg.Width, "old_height", m.height, "new_height", msg.Height)
 		m.width = msg.Width
 		m.height = msg.Height
 
 		// Propagate new window size to all views so they are aware and can render correctly
 		m.authModel.Resize(msg.Width, msg.Height)
 		m.helpModel.Resize(msg.Width, msg.Height)
+		m.animeListModel.Resize(msg.Width, msg.Height)
 	}
 
 	// Delegate message processing to the active view
 	switch m.activeView {
 	case ViewAuth:
 		return m.updateAuthView(msg)
+	case ViewAnimeList:
+		return m.updateAnimeListView(msg)
 	}
 
 	return m, nil
@@ -133,6 +137,8 @@ func (m AppModel) View() string {
 	switch m.activeView {
 	case ViewAuth:
 		return m.authModel.View()
+	case ViewAnimeList:
+		return m.animeListModel.View()
 	default:
 		return "Unknown view\nPress ctrl+c to quit."
 	}
@@ -152,19 +158,40 @@ func (m AppModel) updateAuthView(msg tea.Msg) (tea.Model, tea.Cmd) {
 			log.Warn("Error saving auth token to config.  Will need to reauthenticate when Hisame opens next", "error", err)
 		}
 		m.authModel.Reset()
+
+		// Initialize AniList client and services
+		client, err := anilist.NewClient(typedMsg.Token)
+		if err != nil {
+			log.Error("Failed to create AniList client after authentication", "error", err)
+			return m, tea.Quit
+		}
+
+		animeRepo := anilist.NewAnimeRepository(client)
+		m.animeService = service.NewAnimeService(animeRepo)
+		m.animeListModel = NewAnimeListModel(m.config, m.animeService)
+		m.animeListModel.Resize(m.width, m.height)
 		m.activeView = ViewAnimeList
-		// TODO: Initialise/load data from AniList
-		return m, nil
+
+		return m, m.animeListModel.Init()
 	case AuthFailedMsg:
 		log.Error("Authentication failed", "error", typedMsg.Error)
 		m.authModel.Reset()
 		// TODO:  Add better error handling when auth fails
-		os.Exit(1)
+		return m, tea.Quit
 	}
 
 	// Delegate other messages to the model
 	authModel, cmd := m.authModel.Update(msg)
 	m.authModel = authModel.(*AuthModel)
+
+	return m, cmd
+}
+
+// updateAnimeListView delegates message processing to the anime list model
+func (m AppModel) updateAnimeListView(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Delegate to the animeListModel
+	animeListModel, cmd := m.animeListModel.Update(msg)
+	m.animeListModel = animeListModel.(*AnimeListModel)
 
 	return m, cmd
 }

@@ -84,7 +84,18 @@ TODO - this is the auth view help
 		title = "Anime List Help"
 		content = globalCommands + `## Anime List Commands
 
-TODO - this is the anime list help
+* ↑/k: Move cursor up
+* ↓/j: Move cursor down
+* Enter: View details of selected anime
+* r: Refresh anime list
+
+## Filtering
+
+* 1: Toggle Watching filter
+* 2: Toggle Planning filter
+* 3: Toggle Completed filter
+* 4: Toggle Dropped filter
+* 5: Toggle Paused filter
 `
 
 	default:
