@@ -289,7 +289,7 @@ func (m *AnimeListModel) renderAnimeList() string {
 	}
 
 	// Determine visible range
-	visibleCount := min(len(animeList), availableHeight)
+	visibleCount := min(len(animeList), availableHeight-1) // Reserve space for header row
 
 	// Adjust starting index to keep cursor in view
 	startIdx := 0
@@ -303,6 +303,12 @@ func (m *AnimeListModel) renderAnimeList() string {
 	}
 
 	// Styles for list items
+	headerStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#FFFFFF")).
+		Width(m.width-4).
+		Padding(0, 1)
+
 	selectedStyle := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("#FFFFFF")).
@@ -314,8 +320,18 @@ func (m *AnimeListModel) renderAnimeList() string {
 		Width(m.width-4).
 		Padding(0, 1)
 
-	// Build the list
+	// Build the list with header
 	var listContent string
+
+	// Add column headers
+	headerText := fmt.Sprintf("%-50s %-10s", "Title", "Progress")
+	listContent += headerStyle.Render(headerText) + "\n"
+
+	// Add a separator line
+	separatorLine := strings.Repeat("─", m.width-6) // Adjust width to fit inside the box
+	listContent += separatorLine + "\n"
+
+	// Add anime items
 	for i := startIdx; i < endIdx; i++ {
 		anime := animeList[i]
 
