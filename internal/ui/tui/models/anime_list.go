@@ -435,10 +435,9 @@ func (m *AnimeListModel) renderAnimeList() string {
 	var listContent string
 
 	// Add column headers
-	headerText := fmt.Sprintf("%-3s %-50s %10s", "Sts", "Title", "Progress")
+	headerText := fmt.Sprintf("%1s %-100s %8s %8s %5s %9s %12s",
+		" ", "Title", "Progress", "Format", "Score", "Status", "Next Ep")
 	listContent += headerStyle.Render(headerText) + "\n"
-	//headerText := fmt.Sprintf("%-50s %-10s", "Title", "Progress")
-	//listContent += headerStyle.Render(headerText) + "\n"
 
 	// Add a separator line
 	separatorLine := strings.Repeat("─", m.width-6) // Adjust width to fit inside the box
@@ -480,11 +479,20 @@ func truncateString(s string, maxWidth int) string {
 	return s // Return as is if it fits
 }
 
-// formatAnimeListItem formats a single anime list item
+// In formatAnimeListItem function:
 func (m *AnimeListModel) formatAnimeListItem(anime *domain.Anime) string {
+	available := " " // Default: empty/space
+	if anime.UserData != nil && anime.Episodes > 0 {
+		// If the user hasn't watched all aired episodes
+		if anime.UserData.Progress < anime.Episodes {
+			available = "+"
+		}
+	}
+
 	title := anime.Title.Preferred(m.config.UI.TitleLanguage)
 
-	titleWidth := 50
+	// Truncate title to fit available space
+	titleWidth := 100
 	truncatedTitle := truncateString(title, titleWidth)
 
 	// Pad with spaces to ensure consistent width
@@ -497,6 +505,13 @@ func (m *AnimeListModel) formatAnimeListItem(anime *domain.Anime) string {
 		paddedTitle = truncatedTitle + strings.Repeat(" ", titleWidth-titleVisualWidth)
 	}
 
+	// Format - TV, Movie, OVA, etc.
+	format := "?"
+	if anime.Format != "" {
+		format = string(anime.Format)
+	}
+
+	// Progress
 	progress := ""
 	if anime.UserData != nil {
 		if anime.Episodes > 0 {
@@ -506,27 +521,61 @@ func (m *AnimeListModel) formatAnimeListItem(anime *domain.Anime) string {
 		}
 	}
 
-	// Get status indicator
-	statusIndicator := "[?]"
+	// Mean Score from AniList
+	meanScore := "-"
+	if anime.AverageScore > 0 {
+		meanScore = fmt.Sprintf("%.0f", anime.AverageScore)
+	}
+
+	// Next Airing
+	nextAiring := ""
+	if anime.NextAiringEp != nil {
+		nextAiring = formatTimeUntilAiring(anime.NextAiringEp.TimeUntilAir)
+	} else if anime.Status == "FINISHED" {
+		nextAiring = fmt.Sprintf("%12s", "Finished")
+	}
+
+	// Status indicator
+	statusText := "Unknown"
 	if anime.UserData != nil {
 		switch anime.UserData.Status {
 		case domain.StatusCurrent:
-			statusIndicator = "[W]"
+			statusText = "Watching"
 		case domain.StatusPlanning:
-			statusIndicator = "[P]"
+			statusText = "Planning"
 		case domain.StatusCompleted:
-			statusIndicator = "[C]"
+			statusText = "Completed"
 		case domain.StatusDropped:
-			statusIndicator = "[D]"
+			statusText = "Dropped"
 		case domain.StatusPaused:
-			statusIndicator = "[H]"
+			statusText = "Paused"
 		case domain.StatusRepeating:
-			statusIndicator = "[R]"
+			statusText = "Repeating"
 		}
 	}
 
-	// Format with proper spacing
-	return fmt.Sprintf("%s %s %10s", statusIndicator, paddedTitle, progress)
+	return fmt.Sprintf("%s %-40s %8s %8s %5s %9s %12s",
+		available,
+		paddedTitle,
+		progress,
+		format,
+		meanScore,
+		statusText,
+		nextAiring)
+}
+
+// formatTimeUntilAiring formats a duration into a human-readable string
+// showing two levels of time (days/hours or hours/minutes) at most
+func formatTimeUntilAiring(seconds int64) string {
+	timeUntil := time.Duration(seconds) * time.Second
+
+	// Calculate days, hours, minutes
+	days := int(timeUntil.Hours() / 24)
+	hours := int(timeUntil.Hours()) % 24
+	minutes := int(timeUntil.Minutes()) % 60
+
+	// Format with consistent spacing:
+	return fmt.Sprintf("%3dd %02dh %02dm", days, hours, minutes)
 }
 
 // getSelectedAnime returns the currently selected anime or nil if none
