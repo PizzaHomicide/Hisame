@@ -626,10 +626,11 @@ func (m *AnimeListModel) renderFilterStatus() string {
 		conditionalIndicator(m.filters.hasAvailableEpisodes, "A", "-"),
 		conditionalIndicator(m.filters.isFinishedAiring, "F", "-"))
 
-	searchFilter := ""
+	searchText := "-"
 	if m.filters.searchQuery != "" {
-		searchFilter = fmt.Sprintf(" | Search: \"%s\"", m.filters.searchQuery)
+		searchText = fmt.Sprintf("\"%s\"", m.filters.searchQuery)
 	}
+	searchFilter := fmt.Sprintf(" | Search: %s", searchText)
 
 	// Join all filter sections
 	filterLine := " Status -> " + strings.Join(statusIndicators, " ") + " " + episodeFilters + " " + searchFilter
