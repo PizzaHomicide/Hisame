@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/PizzaHomicide/hisame/internal/config"
+	"github.com/PizzaHomicide/hisame/internal/player"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/mattn/go-runewidth"
 	"strings"
@@ -30,6 +31,7 @@ type AnimeFilterSet struct {
 type AnimeListModel struct {
 	config        *config.Config
 	animeService  *service.AnimeService
+	playerService *player.PlayerService
 	width, height int
 	loading       bool
 	loadError     error
@@ -60,6 +62,7 @@ func NewAnimeListModel(cfg *config.Config, animeService *service.AnimeService) *
 	return &AnimeListModel{
 		config:        cfg,
 		animeService:  animeService,
+		playerService: player.NewPlayerService(cfg),
 		loading:       true,
 		spinner:       s,
 		filters:       defaultFilters,
@@ -158,6 +161,14 @@ func (m *AnimeListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			log.Info("Play next episode", "title", m.getSelectedAnime().Title.Preferred(m.config.UI.TitleLanguage), "id", m.getSelectedAnime().ID)
 		case "ctrl+p":
 			log.Info("Choose episode to play", "title", m.getSelectedAnime().Title.Preferred(m.config.UI.TitleLanguage), "id", m.getSelectedAnime().ID)
+			// TODO:  This should be in a goroutine and do message handling shit instead.  But this is just to test.
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			eps, err := m.playerService.FindEpisodes(ctx, m.getSelectedAnime().ID, m.getSelectedAnime().Title.English, m.getSelectedAnime().Synonyms)
+			if err != nil {
+				log.Error("Failed to get episodes", "error", err)
+			}
+			log.Info("Episodes selected", "episodes", eps)
 		case "r":
 			// Refresh anime list
 			m.loading = true
