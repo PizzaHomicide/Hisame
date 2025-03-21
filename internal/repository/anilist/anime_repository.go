@@ -44,6 +44,7 @@ func (r *AnimeRepository) GetAllAnimeList(ctx context.Context) ([]*domain.Anime,
                             season
                             seasonYear
                             averageScore
+							synonyms
                         }
                         status
                         score
@@ -86,6 +87,7 @@ func (r *AnimeRepository) GetAllAnimeList(ctx context.Context) ([]*domain.Anime,
 						Season       string
 						SeasonYear   int
 						AverageScore float64
+						Synonyms     []string
 					}
 					Status    string
 					Score     float64
@@ -128,6 +130,7 @@ func (r *AnimeRepository) GetAllAnimeList(ctx context.Context) ([]*domain.Anime,
 				Season:       entry.Media.Season,
 				SeasonYear:   fmt.Sprintf("%d", entry.Media.SeasonYear),
 				AverageScore: entry.Media.AverageScore,
+				Synonyms:     entry.Media.Synonyms,
 				UserData: &domain.UserAnimeData{
 					Status:    domain.MediaStatus(entry.Status),
 					Score:     entry.Score,

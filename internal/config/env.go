@@ -44,6 +44,11 @@ var supportedEnvVars = []envVar{
 		apply: func(c *Config, s string) { c.Player.Args = s },
 	},
 	{
+		name:  "HISAME_CONFIG_PLAYER_TRANSLATION_TYPE",
+		desc:  "Sets the translation type to search for.  Default: sub",
+		apply: func(c *Config, s string) { c.Player.TranslationType = s },
+	},
+	{
 		name:  "HISAME_CONFIG_LOGGING_LEVEL",
 		desc:  "Sets the logging level.  One of: debug, info, warn, error.  Default: info",
 		apply: func(c *Config, s string) { c.Logging.Level = s },

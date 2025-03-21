@@ -42,6 +42,7 @@ func TestConfigIntegration(t *testing.T) {
 
 		// Verify default values
 		assert.Equal(t, "mpv", config.Player.Type)
+		assert.Equal(t, "sub", config.Player.TranslationType)
 		assert.Equal(t, "english", config.UI.TitleLanguage)
 		assert.Equal(t, "info", config.Logging.Level)
 		assert.NotEmpty(t, config.Logging.FilePath)
@@ -65,9 +66,10 @@ func TestConfigIntegration(t *testing.T) {
 				Token: "test-token",
 			},
 			Player: PlayerConfig{
-				Type: "custom",
-				Path: "/usr/bin/vlc",
-				Args: "--fullscreen",
+				Type:            "custom",
+				Path:            "/usr/bin/vlc",
+				Args:            "--fullscreen",
+				TranslationType: "dub",
 			},
 			UI: UIConfig{
 				TitleLanguage: "romaji",
@@ -86,6 +88,7 @@ func TestConfigIntegration(t *testing.T) {
 		assert.Equal(t, "custom", loadedConfig.Player.Type)
 		assert.Equal(t, "/usr/bin/vlc", loadedConfig.Player.Path)
 		assert.Equal(t, "--fullscreen", loadedConfig.Player.Args)
+		assert.Equal(t, "dub", loadedConfig.Player.TranslationType)
 		assert.Equal(t, "romaji", loadedConfig.UI.TitleLanguage)
 		assert.Equal(t, "error", loadedConfig.Logging.Level)
 		assert.Equal(t, "/var/log/hisame.log", loadedConfig.Logging.FilePath)
@@ -114,6 +117,7 @@ func TestConfigIntegration(t *testing.T) {
 		setEnv(t, "HISAME_CONFIG_PLAYER_TYPE", "custom")
 		setEnv(t, "HISAME_CONFIG_PLAYER_PATH", "/vlc")
 		setEnv(t, "HISAME_CONFIG_PLAYER_ARGS", "--fullscreen")
+		setEnv(t, "HISAME_CONFIG_PLAYER_TRANSLATION_TYPE", "dub")
 		setEnv(t, "HISAME_CONFIG_LOGGING_LEVEL", "warn")
 		setEnv(t, "HISAME_CONFIG_LOGGING_FILE_PATH", "/hisame.log")
 
@@ -124,6 +128,7 @@ func TestConfigIntegration(t *testing.T) {
 		assert.Equal(t, "custom", config.Player.Type)
 		assert.Equal(t, "/vlc", config.Player.Path)
 		assert.Equal(t, "--fullscreen", config.Player.Args)
+		assert.Equal(t, "dub", config.Player.TranslationType)
 		assert.Equal(t, "warn", config.Logging.Level)
 		assert.Equal(t, "/hisame.log", config.Logging.FilePath)
 

@@ -25,9 +25,10 @@ type AuthConfig struct {
 
 // PlayerConfig contains media player settings
 type PlayerConfig struct {
-	Type string `yaml:"type,omitempty"` // "mpv", "custom"
-	Path string `yaml:"path,omitempty"`
-	Args string `yaml:"args,omitempty"`
+	Type            string `yaml:"type,omitempty"` // "mpv", "custom"
+	Path            string `yaml:"path,omitempty"`
+	Args            string `yaml:"args,omitempty"`
+	TranslationType string `yaml:"translation_type,omitempty"` // "sub", "dub"
 }
 
 // UIConfig contains UI display preferences
@@ -157,7 +158,9 @@ func createBaseDefaultConfig() *Config {
 	return &Config{
 		Auth: AuthConfig{},
 		Player: PlayerConfig{
-			Type: "mpv",
+			Type:            "mpv",
+			Path:            "mpv",
+			TranslationType: "sub",
 		},
 		UI: UIConfig{
 			TitleLanguage: "english",

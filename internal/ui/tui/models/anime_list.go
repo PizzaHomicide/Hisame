@@ -56,7 +56,6 @@ func NewAnimeListModel(cfg *config.Config, animeService *service.AnimeService) *
 	ti := textinput.New()
 	ti.Placeholder = "Search anime..."
 	ti.Width = 30
-	ti.Focus()
 
 	return &AnimeListModel{
 		config:        cfg,
@@ -154,7 +153,11 @@ func (m *AnimeListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case "enter":
 			// TODO: Implement view detail of selected anime
-			log.Info("View anime detail", "title", m.getSelectedAnime().Title.English, "id", m.getSelectedAnime().ID)
+			log.Info("View anime detail", "title", m.getSelectedAnime().Title.Preferred(m.config.UI.TitleLanguage), "id", m.getSelectedAnime().ID)
+		case "p":
+			log.Info("Play next episode", "title", m.getSelectedAnime().Title.Preferred(m.config.UI.TitleLanguage), "id", m.getSelectedAnime().ID)
+		case "ctrl+p":
+			log.Info("Choose episode to play", "title", m.getSelectedAnime().Title.Preferred(m.config.UI.TitleLanguage), "id", m.getSelectedAnime().ID)
 		case "r":
 			// Refresh anime list
 			m.loading = true

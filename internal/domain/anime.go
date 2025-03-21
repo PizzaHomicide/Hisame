@@ -24,6 +24,7 @@ type Anime struct {
 	Season       string
 	SeasonYear   string
 	AverageScore float64
+	Synonyms     []string
 	UserData     *UserAnimeData
 }
 
