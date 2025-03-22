@@ -160,7 +160,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		log.Info("Next episode found",
 			"title", msg.Episode.Title,
 			"overall_epNum", msg.Episode.OverallEpisodeNumber,
-			"allanime_epNum", msg.Episode.AllAnimeID,
+			"allanime_epNum", msg.Episode.AllAnimeEpisodeNumber,
 			"allanime_id", msg.Episode.AllAnimeID,
 		)
 		m.animeListModel.DisableLoading()
