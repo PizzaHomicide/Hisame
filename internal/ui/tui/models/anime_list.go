@@ -158,7 +158,32 @@ func (m *AnimeListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// TODO: Implement view detail of selected anime
 			log.Info("View anime detail", "title", m.getSelectedAnime().Title.Preferred(m.config.UI.TitleLanguage), "id", m.getSelectedAnime().ID)
 		case "p":
-			log.Info("Play next episode", "title", m.getSelectedAnime().Title.Preferred(m.config.UI.TitleLanguage), "id", m.getSelectedAnime().ID)
+			nextEpNumber := m.getSelectedAnime().UserData.Progress + 1
+			log.Info("Play next episode", "title", m.getSelectedAnime().Title.Preferred(m.config.UI.TitleLanguage), "id", m.getSelectedAnime().ID,
+				"current_progress", m.getSelectedAnime().UserData.Progress, "next_ep", nextEpNumber)
+			// TODO:  This should be in a goroutine and do message handling shit instead.  But this is just to test.
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			eps, err := m.playerService.FindEpisodes(ctx, m.getSelectedAnime().ID, m.getSelectedAnime().Title.English, m.getSelectedAnime().Synonyms)
+			if err != nil {
+				log.Error("Failed to get episodes", "error", err)
+			}
+			var selectedEp *player.AllAnimeEpisodeInfo
+			for _, ep := range eps.Episodes {
+				if ep.OverallEpisodeNumber == nextEpNumber {
+					selectedEp = &ep
+				}
+			}
+
+			if selectedEp == nil {
+				log.Error("Could not find next episode", "nextEp", nextEpNumber)
+				// Return what?
+			} else {
+				// Success!
+				log.Info("Selected next episode to play", "overall_epNum", selectedEp.OverallEpisodeNumber, "allanime_epNum", selectedEp.AllAnimeEpisodeNumber,
+					"allanime_id", selectedEp.AllAnimeID, "anilist_id", selectedEp.AniListID)
+			}
+			return m, nil
 		case "ctrl+p":
 			log.Info("Choose episode to play", "title", m.getSelectedAnime().Title.Preferred(m.config.UI.TitleLanguage), "id", m.getSelectedAnime().ID)
 			// TODO:  This should be in a goroutine and do message handling shit instead.  But this is just to test.
