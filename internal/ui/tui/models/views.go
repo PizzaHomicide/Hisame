@@ -16,6 +16,7 @@ type Modal string
 
 // Available modals in the application
 const (
-	ModalNone Modal = "none"
-	ModalHelp Modal = "help"
+	ModalNone          Modal = "none"
+	ModalHelp          Modal = "help"
+	ModalEpisodeSelect Modal = "episode_select"
 )

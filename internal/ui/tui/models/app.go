@@ -16,9 +16,10 @@ type AppModel struct {
 	width, height int
 
 	// Models used for various views
-	authModel      *AuthModel
-	animeListModel *AnimeListModel
-	helpModel      *HelpModel
+	authModel          *AuthModel
+	animeListModel     *AnimeListModel
+	helpModel          *HelpModel
+	episodeSelectModel *EpisodeSelectModel
 
 	// Services used for fetching and updating state
 	animeService *service.AnimeService
@@ -46,13 +47,14 @@ func NewAppModel(cfg *config.Config) AppModel {
 		initialView = ViewAuth
 	}
 	return AppModel{
-		config:         cfg,
-		activeView:     initialView,
-		activeModal:    ModalNone,
-		authModel:      NewAuthModel(),
-		animeListModel: NewAnimeListModel(cfg, animeService),
-		helpModel:      NewHelpModel(),
-		animeService:   animeService,
+		config:             cfg,
+		activeView:         initialView,
+		activeModal:        ModalNone,
+		authModel:          NewAuthModel(),
+		animeListModel:     NewAnimeListModel(cfg, animeService),
+		helpModel:          NewHelpModel(),
+		episodeSelectModel: NewEpisodeSelectModel(),
+		animeService:       animeService,
 	}
 }
 
@@ -113,6 +115,64 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.authModel.Resize(msg.Width, msg.Height)
 		m.helpModel.Resize(msg.Width, msg.Height)
 		m.animeListModel.Resize(msg.Width, msg.Height)
+		m.episodeSelectModel.Resize(msg.Width, msg.Height)
+
+	case EpisodeLoadedMsg:
+		if len(msg.Episodes) == 0 {
+			log.Warn("No episodes found for anime", "title", msg.Title)
+			return m, nil
+		}
+
+		log.Info("Episodes loaded", "count", len(msg.Episodes), "title", msg.Title)
+
+		// Set the episodes in the model
+		m.episodeSelectModel.SetEpisodes(msg.Episodes, msg.Title)
+
+		// Activate the episode selection modal
+		m.activeModal = ModalEpisodeSelect
+
+		m.animeListModel.DisableLoading()
+
+		return m, nil
+
+	case EpisodeLoadErrorMsg:
+		log.Error("Failed to load episodes", "error", msg.Error)
+		// Could display an error notification here
+		return m, nil
+
+	case EpisodeSelectMsg:
+		// An episode was selected from the modal
+		if msg.Episode != nil {
+			log.Info("Episode selected to play",
+				"overall_epNum", msg.Episode.OverallEpisodeNumber,
+				"allanime_epNum", msg.Episode.AllAnimeEpisodeNumber,
+				"allanime_id", msg.Episode.AllAnimeID,
+				"title", msg.Episode.Title)
+
+			// TODO: Play the selected episode
+
+			// Close the modal
+			m.activeModal = ModalNone
+		}
+		return m, nil
+
+	case NextEpisodeFoundMsg:
+		log.Info("Next episode found",
+			"title", msg.Episode.Title,
+			"overall_epNum", msg.Episode.OverallEpisodeNumber,
+			"allanime_epNum", msg.Episode.AllAnimeID,
+			"allanime_id", msg.Episode.AllAnimeID,
+		)
+		m.animeListModel.DisableLoading()
+
+		// TODO: Play the selected episode
+		return m, nil
+	}
+
+	// Prioritise delegating messages to a modal if one is active
+	switch m.activeModal {
+	case ModalEpisodeSelect:
+		return m.updateEpisodeSelectModal(msg)
 	}
 
 	// Delegate message processing to the active view
@@ -131,6 +191,8 @@ func (m AppModel) View() string {
 	switch m.activeModal {
 	case ModalHelp:
 		return m.helpModel.View(m.activeView)
+	case ModalEpisodeSelect:
+		return m.episodeSelectModel.View()
 	}
 
 	// Else display the actual view
@@ -192,6 +254,14 @@ func (m AppModel) updateAnimeListView(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Delegate to the animeListModel
 	animeListModel, cmd := m.animeListModel.Update(msg)
 	m.animeListModel = animeListModel.(*AnimeListModel)
+
+	return m, cmd
+}
+
+func (m AppModel) updateEpisodeSelectModal(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Delegate to the episode select model
+	model, cmd := m.episodeSelectModel.Update(msg)
+	m.episodeSelectModel = model.(*EpisodeSelectModel)
 
 	return m, cmd
 }

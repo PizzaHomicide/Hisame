@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/PizzaHomicide/hisame/internal/config"
 	"github.com/PizzaHomicide/hisame/internal/player"
+	"github.com/PizzaHomicide/hisame/internal/ui/tui/util"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/mattn/go-runewidth"
 	"strings"
@@ -34,6 +35,7 @@ type AnimeListModel struct {
 	playerService *player.PlayerService
 	width, height int
 	loading       bool
+	loadingMsg    string
 	loadError     error
 	spinner       spinner.Model
 	filters       AnimeFilterSet
@@ -64,6 +66,7 @@ func NewAnimeListModel(cfg *config.Config, animeService *service.AnimeService) *
 		animeService:  animeService,
 		playerService: player.NewPlayerService(cfg),
 		loading:       true,
+		loadingMsg:    "Loading anime list...",
 		spinner:       s,
 		filters:       defaultFilters,
 		cursor:        0,
@@ -161,50 +164,42 @@ func (m *AnimeListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			nextEpNumber := m.getSelectedAnime().UserData.Progress + 1
 			log.Info("Play next episode", "title", m.getSelectedAnime().Title.Preferred(m.config.UI.TitleLanguage), "id", m.getSelectedAnime().ID,
 				"current_progress", m.getSelectedAnime().UserData.Progress, "next_ep", nextEpNumber)
-			// TODO:  This should be in a goroutine and do message handling shit instead.  But this is just to test.
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancel()
-			eps, err := m.playerService.FindEpisodes(ctx, m.getSelectedAnime().ID, m.getSelectedAnime().Title.English, m.getSelectedAnime().Synonyms)
-			if err != nil {
-				log.Error("Failed to get episodes", "error", err)
-			}
-			var selectedEp *player.AllAnimeEpisodeInfo
-			for _, ep := range eps.Episodes {
-				if ep.OverallEpisodeNumber == nextEpNumber {
-					selectedEp = &ep
-				}
-			}
 
-			if selectedEp == nil {
-				log.Error("Could not find next episode", "nextEp", nextEpNumber)
-				// Return what?
-			} else {
-				// Success!
-				log.Info("Selected next episode to play", "overall_epNum", selectedEp.OverallEpisodeNumber, "allanime_epNum", selectedEp.AllAnimeEpisodeNumber,
-					"allanime_id", selectedEp.AllAnimeID, "anilist_id", selectedEp.AniListID)
-			}
-			return m, nil
+			// Set loading state with custom message
+			m.loading = true
+			m.loadingMsg = fmt.Sprintf("Finding episode %d for %s...", nextEpNumber, m.getSelectedAnime().Title.Preferred(m.config.UI.TitleLanguage))
+
+			return m, tea.Batch(
+				m.spinner.Tick,
+				m.loadNextEpisode(nextEpNumber),
+			)
 		case "ctrl+p":
 			log.Info("Choose episode to play", "title", m.getSelectedAnime().Title.Preferred(m.config.UI.TitleLanguage), "id", m.getSelectedAnime().ID)
-			// TODO:  This should be in a goroutine and do message handling shit instead.  But this is just to test.
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancel()
-			eps, err := m.playerService.FindEpisodes(ctx, m.getSelectedAnime().ID, m.getSelectedAnime().Title.English, m.getSelectedAnime().Synonyms)
-			if err != nil {
-				log.Error("Failed to get episodes", "error", err)
-			}
-			log.Info("Episodes selected", "episodes", eps)
+			m.loading = true
+			m.loadingMsg = fmt.Sprintf("Finding episodes for %s...", m.getSelectedAnime().Title.Preferred(m.config.UI.TitleLanguage))
+			return m, tea.Batch(
+				m.spinner.Tick,
+				m.loadEpisodes(),
+			)
 		case "r":
 			// Refresh anime list
 			m.loading = true
+			m.loadingMsg = "Loading anime list..."
 			m.loadError = nil
-			return m, loadAnimeList(m.animeService)
+			return m, tea.Batch(
+				m.spinner.Tick,
+				loadAnimeList(m.animeService),
+			)
+
 		}
 
 	case spinner.TickMsg:
-		var spinnerCmd tea.Cmd
-		m.spinner, spinnerCmd = m.spinner.Update(msg)
-		return m, spinnerCmd
+		if m.loading {
+			var spinnerCmd tea.Cmd
+			m.spinner, spinnerCmd = m.spinner.Update(msg)
+			return m, spinnerCmd
+		}
+		return m, nil
 
 	case AnimeListLoadedMsg:
 		log.Debug("Anime list loaded")
@@ -287,7 +282,7 @@ func (m *AnimeListModel) View() string {
 		return styles.CenteredView(
 			m.width,
 			m.height,
-			fmt.Sprintf("%s Loading anime list...", m.spinner.View()),
+			fmt.Sprintf("%s %s", m.spinner.View(), m.loadingMsg),
 		)
 	}
 
@@ -504,20 +499,6 @@ func (m *AnimeListModel) renderAnimeList() string {
 	return styles.ContentBox(m.width-2, listContent, 1)
 }
 
-// truncateString cuts a string to fit within maxWidth visual width
-func truncateString(s string, maxWidth int) string {
-	width := 0
-	for i, r := range s {
-		charWidth := runewidth.RuneWidth(r)
-		// Check if adding this rune would exceed maxWidth
-		if width+charWidth > maxWidth-3 { // Reserve space for "..."
-			return s[:i] + "..."
-		}
-		width += charWidth
-	}
-	return s // Return as is if it fits
-}
-
 // In formatAnimeListItem function:
 func (m *AnimeListModel) formatAnimeListItem(anime *domain.Anime) string {
 	available := " " // Default: empty/space
@@ -532,7 +513,7 @@ func (m *AnimeListModel) formatAnimeListItem(anime *domain.Anime) string {
 
 	// Truncate title to fit available space
 	titleWidth := 100
-	truncatedTitle := truncateString(title, titleWidth)
+	truncatedTitle := util.TruncateString(title, titleWidth)
 
 	// Pad with spaces to ensure consistent width
 	paddedTitle := truncatedTitle
@@ -683,4 +664,83 @@ func conditionalIndicator(condition bool, activeChar, inactiveChar string) strin
 		return activeChar
 	}
 	return inactiveChar
+}
+
+func (m *AnimeListModel) loadEpisodes() tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		anime := m.getSelectedAnime()
+
+		epResult, err := m.playerService.FindEpisodes(
+			ctx,
+			anime.ID,
+			anime.Title.English,
+			anime.Synonyms,
+		)
+
+		if err != nil {
+			log.Error("Failed to get episodes", "error", err)
+			return EpisodeLoadErrorMsg{Error: err}
+		}
+
+		return EpisodeLoadedMsg{
+			Episodes: epResult.Episodes,
+			Title:    anime.Title.Preferred(m.config.UI.TitleLanguage),
+		}
+	}
+}
+
+// loadNextEpisode loads the specific next episode for an anime
+func (m *AnimeListModel) loadNextEpisode(nextEpNumber int) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		anime := m.getSelectedAnime()
+
+		eps, err := m.playerService.FindEpisodes(
+			ctx,
+			anime.ID,
+			anime.Title.English,
+			anime.Synonyms,
+		)
+
+		if err != nil {
+			log.Error("Failed to get episodes", "error", err)
+			return EpisodeLoadErrorMsg{Error: err}
+		}
+
+		// Find the specific episode we want
+		var selectedEp *player.AllAnimeEpisodeInfo
+		for i, ep := range eps.Episodes {
+			if ep.OverallEpisodeNumber == nextEpNumber {
+				selectedEp = &eps.Episodes[i]
+				break
+			}
+		}
+
+		if selectedEp == nil {
+			log.Error("Could not find next episode", "nextEp", nextEpNumber)
+			return EpisodeLoadErrorMsg{
+				Error: fmt.Errorf("could not find episode %d", nextEpNumber),
+			}
+		}
+
+		// Success! Return the found episode
+		log.Info("Selected next episode to play",
+			"overall_epNum", selectedEp.OverallEpisodeNumber,
+			"allanime_epNum", selectedEp.AllAnimeEpisodeNumber,
+			"allanime_id", selectedEp.AllAnimeID,
+			"anilist_id", selectedEp.AniListID)
+
+		return NextEpisodeFoundMsg{
+			Episode: *selectedEp,
+		}
+	}
+}
+
+func (m *AnimeListModel) DisableLoading() {
+	m.loading = false
 }
