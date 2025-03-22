@@ -161,3 +161,64 @@ func (c *AllAnimeClient) SearchShows(ctx context.Context, query string, translat
 
 	return response.Shows.Edges, nil
 }
+
+// EpisodeSource represents a single streaming source for an episode
+type EpisodeSource struct {
+	SourceURL  string  `json:"sourceUrl"`
+	Priority   float64 `json:"priority"`
+	SourceName string  `json:"sourceName"`
+	Type       string  `json:"type"` // "iframe", "player", etc.
+	ClassName  string  `json:"className"`
+	StreamerID string  `json:"streamerId"`
+	Downloads  *struct {
+		SourceName  string `json:"sourceName"`
+		DownloadURL string `json:"downloadUrl"`
+	} `json:"downloads,omitempty"`
+	Sandbox string `json:"sandbox,omitempty"`
+}
+
+// EpisodeSourceResponse represents the structure of the GraphQL response
+type EpisodeSourceResponse struct {
+	Episode struct {
+		EpisodeString string          `json:"episodeString"`
+		SourceUrls    []EpisodeSource `json:"sourceUrls"`
+	} `json:"episode"`
+}
+
+// GetEpisodeSources fetches the available streaming sources for a specific episode
+func (c *AllAnimeClient) GetEpisodeSources(ctx context.Context, showID string, episodeNum string, translationType string) ([]EpisodeSource, error) {
+	// Create the GraphQL request
+	req := graphql.NewRequest(`
+		query ($showId: String!, $translationType: VaildTranslationTypeEnumType!, $episodeString: String!) {
+			episode(
+				showId: $showId
+				translationType: $translationType
+				episodeString: $episodeString
+			) {
+				episodeString
+				sourceUrls
+			}
+		}
+	`)
+
+	// Set the variables
+	req.Var("showId", showID)
+	req.Var("translationType", translationType)
+	req.Var("episodeString", episodeNum)
+
+	// Set the user agent header
+	req.Header.Set("User-Agent", allAnimeUserAgent)
+
+	log.Debug("Fetching episode sources", "showId", showID, "episodeNum", episodeNum, "translationType", translationType)
+
+	// Execute the request
+	var response EpisodeSourceResponse
+	if err := c.client.Run(ctx, req, &response); err != nil {
+		log.Error("Error fetching episode sources", "error", err)
+		return nil, fmt.Errorf("error fetching episode sources: %w", err)
+	}
+
+	sources := response.Episode.SourceUrls
+	log.Debug("Episode sources retrieved successfully", "count", len(sources))
+	return sources, nil
+}

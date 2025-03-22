@@ -201,6 +201,86 @@ func (m *AnimeListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case NextEpisodeFoundMsg:
+		log.Info("Next episode found, loading sources",
+			"title", msg.Episode.Title,
+			"overall_epNum", msg.Episode.OverallEpisodeNumber,
+			"allanime_epNum", msg.Episode.AllAnimeEpisodeNumber,
+			"allanime_id", msg.Episode.AllAnimeID)
+
+		// Start loading the sources for this episode
+		m.loading = true
+		m.loadingMsg = fmt.Sprintf("Loading sources for episode %s of %s...",
+			msg.Episode.AllAnimeEpisodeNumber,
+			msg.Episode.Title)
+
+		return m, tea.Batch(
+			m.spinner.Tick,
+			m.playEpisode(msg.Episode),
+		)
+
+	case EpisodeSourcesLoadedMsg:
+		m.loading = false
+
+		log.Info("Episode sources loaded successfully",
+			"title", msg.EpisodeInfo.Title,
+			"episode", msg.EpisodeInfo.AllAnimeEpisodeNumber,
+			"source_count", len(msg.Sources.Sources))
+
+		// Log details about each source
+		for i, source := range msg.Sources.Sources {
+			log.Debug("Source option",
+				"index", i,
+				"name", source.SourceName,
+				"priority", source.Priority,
+				"type", source.Type,
+				"has_download", source.Downloads != nil)
+		}
+
+		// At this point, we would normally launch the player
+		// For now, just log that we would play the highest priority source
+		if len(msg.Sources.Sources) > 0 {
+			bestSource := msg.Sources.Sources[0] // Already sorted by priority
+			log.Info("Would play this source (highest priority)",
+				"name", bestSource.SourceName,
+				"priority", bestSource.Priority,
+				"type", bestSource.Type,
+				"url", bestSource.SourceURL)
+		}
+
+		return m, nil
+
+	case EpisodeSourcesErrorMsg:
+		m.loading = false
+
+		log.Error("Failed to load episode sources",
+			"title", msg.EpisodeInfo.Title,
+			"episode", msg.EpisodeInfo.AllAnimeEpisodeNumber,
+			"error", msg.Error)
+
+		return m, nil
+
+	case EpisodeSelectMsg:
+		if msg.Episode != nil {
+			log.Info("Episode selected from modal",
+				"overall_epNum", msg.Episode.OverallEpisodeNumber,
+				"allanime_epNum", msg.Episode.AllAnimeEpisodeNumber,
+				"allanime_id", msg.Episode.AllAnimeID,
+				"title", msg.Episode.Title)
+
+			// Start loading the sources
+			m.loading = true
+			m.loadingMsg = fmt.Sprintf("Loading sources for episode %s of %s...",
+				msg.Episode.AllAnimeEpisodeNumber,
+				msg.Episode.Title)
+
+			return m, tea.Batch(
+				m.spinner.Tick,
+				m.playEpisode(*msg.Episode),
+			)
+		}
+		return m, nil
+
 	case AnimeListLoadedMsg:
 		log.Debug("Anime list loaded")
 		m.loading = false
@@ -743,4 +823,34 @@ func (m *AnimeListModel) loadNextEpisode(nextEpNumber int) tea.Cmd {
 
 func (m *AnimeListModel) DisableLoading() {
 	m.loading = false
+}
+
+// playEpisode loads the sources for the selected episode and prepares to play it
+func (m *AnimeListModel) playEpisode(episode player.AllAnimeEpisodeInfo) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		// Log that we're attempting to play this episode
+		log.Info("Attempting to play episode",
+			"title", episode.Title,
+			"overall_epNum", episode.OverallEpisodeNumber,
+			"allanime_epNum", episode.AllAnimeEpisodeNumber)
+
+		// Get sources for the episode
+		sources, err := m.playerService.GetEpisodeSources(ctx, episode)
+		if err != nil {
+			log.Error("Failed to get episode sources", "error", err)
+			return EpisodeSourcesErrorMsg{
+				Error:       err,
+				EpisodeInfo: episode,
+			}
+		}
+
+		// Success! Return the sources info
+		return EpisodeSourcesLoadedMsg{
+			Sources:     sources,
+			EpisodeInfo: episode,
+		}
+	}
 }

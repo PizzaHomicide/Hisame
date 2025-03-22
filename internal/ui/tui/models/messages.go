@@ -36,3 +36,13 @@ type EpisodeSelectMsg struct {
 type NextEpisodeFoundMsg struct {
 	Episode player.AllAnimeEpisodeInfo
 }
+
+type EpisodeSourcesLoadedMsg struct {
+	Sources     *player.EpisodeSourceInfo
+	EpisodeInfo player.AllAnimeEpisodeInfo
+}
+
+type EpisodeSourcesErrorMsg struct {
+	Error       error
+	EpisodeInfo player.AllAnimeEpisodeInfo
+}

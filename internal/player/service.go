@@ -199,3 +199,56 @@ func (s *PlayerService) buildEpisodeList(shows []AllAnimeShow, animeID int) *Fin
 		RawShows: shows,
 	}
 }
+
+// EpisodeSourceInfo contains information about available sources for an episode
+type EpisodeSourceInfo struct {
+	AnimeName       string
+	EpisodeNumber   string
+	AllAnimeID      string
+	Sources         []EpisodeSource
+	TranslationType string
+}
+
+// GetEpisodeSources fetches all available sources for a specific episode
+func (s *PlayerService) GetEpisodeSources(ctx context.Context, animeInfo AllAnimeEpisodeInfo) (*EpisodeSourceInfo, error) {
+	log.Debug("Getting episode sources",
+		"allAnimeID", animeInfo.AllAnimeID,
+		"episodeNumber", animeInfo.AllAnimeEpisodeNumber,
+		"translationType", s.config.Player.TranslationType)
+
+	sources, err := s.animeClient.GetEpisodeSources(
+		ctx,
+		animeInfo.AllAnimeID,
+		animeInfo.AllAnimeEpisodeNumber,
+		s.config.Player.TranslationType,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("error fetching sources: %w", err)
+	}
+
+	if len(sources) == 0 {
+		log.Warn("No sources found for episode",
+			"allAnimeID", animeInfo.AllAnimeID,
+			"episodeNumber", animeInfo.AllAnimeEpisodeNumber)
+		return nil, fmt.Errorf("no sources found for episode %s", animeInfo.AllAnimeEpisodeNumber)
+	}
+
+	// Sort sources by priority (highest first)
+	sort.Slice(sources, func(i, j int) bool {
+		return sources[i].Priority > sources[j].Priority
+	})
+
+	log.Info("Retrieved episode sources",
+		"count", len(sources),
+		"title", animeInfo.Title,
+		"episode", animeInfo.AllAnimeEpisodeNumber)
+
+	return &EpisodeSourceInfo{
+		AnimeName:       animeInfo.Title,
+		EpisodeNumber:   animeInfo.AllAnimeEpisodeNumber,
+		AllAnimeID:      animeInfo.AllAnimeID,
+		Sources:         sources,
+		TranslationType: s.config.Player.TranslationType,
+	}, nil
+}

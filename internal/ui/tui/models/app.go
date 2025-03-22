@@ -149,24 +149,32 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				"allanime_id", msg.Episode.AllAnimeID,
 				"title", msg.Episode.Title)
 
-			// TODO: Play the selected episode
-
 			// Close the modal
 			m.activeModal = ModalNone
+
+			// Delegate to anime list model to handle playing
+			return m.updateAnimeListView(msg)
 		}
 		return m, nil
 
 	case NextEpisodeFoundMsg:
-		log.Info("Next episode found",
+		log.Info("Next episode found in app model",
 			"title", msg.Episode.Title,
 			"overall_epNum", msg.Episode.OverallEpisodeNumber,
 			"allanime_epNum", msg.Episode.AllAnimeEpisodeNumber,
 			"allanime_id", msg.Episode.AllAnimeID,
 		)
+		// Close any active modal
+		m.activeModal = ModalNone
 		m.animeListModel.DisableLoading()
 
-		// TODO: Play the selected episode
-		return m, nil
+		// Delegate to anime list model to handle loading sources
+		return m.updateAnimeListView(msg)
+
+	case EpisodeSourcesLoadedMsg, EpisodeSourcesErrorMsg:
+		// Delegate to anime list model
+		return m.updateAnimeListView(msg)
+
 	}
 
 	// Prioritise delegating messages to a modal if one is active
