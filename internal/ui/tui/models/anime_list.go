@@ -882,6 +882,19 @@ func (m *AnimeListModel) playEpisode(episode player.AllAnimeEpisodeInfo) tea.Cmd
 			"source_name", successSource.SourceName,
 			"url", streamURL)
 
+		// Launch the player with the stream URL
+		err = m.playerService.LaunchPlayer(streamURL)
+		if err != nil {
+			log.Error("Failed to launch media player", "error", err)
+			return EpisodeSourcesErrorMsg{
+				Error:       fmt.Errorf("failed to launch player: %w", err),
+				EpisodeInfo: episode,
+			}
+		}
+
+		// TODO: Update the anime progress after successful playback
+		// This would be implemented later when we add MPV progress tracking
+
 		return EpisodeSourcesLoadedMsg{
 			Sources:     sources,
 			EpisodeInfo: episode,
