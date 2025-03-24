@@ -245,7 +245,7 @@ func (m *AnimeListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				"name", bestSource.SourceName,
 				"priority", bestSource.Priority,
 				"type", bestSource.Type,
-				"url", bestSource.SourceURL)
+				"url", msg.StreamURL)
 		}
 
 		return m, nil
@@ -847,10 +847,45 @@ func (m *AnimeListModel) playEpisode(episode player.AllAnimeEpisodeInfo) tea.Cmd
 			}
 		}
 
-		// Success! Return the sources info
+		// Try to get a working stream URL from each source until one works
+		var streamURL string
+		var successSource player.EpisodeSource
+
+		for _, source := range sources.Sources {
+			log.Info("Attempting to get stream URL",
+				"source_name", source.SourceName,
+				"priority", source.Priority)
+
+			url, err := m.playerService.GetStreamURL(ctx, source)
+			if err != nil {
+				log.Warn("Failed to get stream URL from source",
+					"source_name", source.SourceName,
+					"error", err)
+				continue // Try the next source
+			}
+
+			// Success!
+			streamURL = url
+			successSource = source
+			break
+		}
+
+		if streamURL == "" {
+			return EpisodeSourcesErrorMsg{
+				Error:       fmt.Errorf("failed to get playable URL from any source"),
+				EpisodeInfo: episode,
+			}
+		}
+
+		// Log the URL that would be used to play the episode
+		log.Info("Found playable stream URL",
+			"source_name", successSource.SourceName,
+			"url", streamURL)
+
 		return EpisodeSourcesLoadedMsg{
 			Sources:     sources,
 			EpisodeInfo: episode,
+			StreamURL:   streamURL,
 		}
 	}
 }

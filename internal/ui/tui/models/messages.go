@@ -40,6 +40,7 @@ type NextEpisodeFoundMsg struct {
 type EpisodeSourcesLoadedMsg struct {
 	Sources     *player.EpisodeSourceInfo
 	EpisodeInfo player.AllAnimeEpisodeInfo
+	StreamURL   string
 }
 
 type EpisodeSourcesErrorMsg struct {

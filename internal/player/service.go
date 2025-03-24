@@ -2,13 +2,17 @@ package player
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/PizzaHomicide/hisame/internal/config"
 	"github.com/PizzaHomicide/hisame/internal/log"
+	"io"
+	"net/http"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const (
@@ -209,7 +213,7 @@ type EpisodeSourceInfo struct {
 	TranslationType string
 }
 
-// GetEpisodeSources fetches all available sources for a specific episode
+// GetEpisodeSources fetches all available sources for a specific episode and filters to supported types
 func (s *PlayerService) GetEpisodeSources(ctx context.Context, animeInfo AllAnimeEpisodeInfo) (*EpisodeSourceInfo, error) {
 	log.Debug("Getting episode sources",
 		"allAnimeID", animeInfo.AllAnimeID,
@@ -227,28 +231,212 @@ func (s *PlayerService) GetEpisodeSources(ctx context.Context, animeInfo AllAnim
 		return nil, fmt.Errorf("error fetching sources: %w", err)
 	}
 
-	if len(sources) == 0 {
-		log.Warn("No sources found for episode",
+	log.Info("Retrieved all episode sources",
+		"total_count", len(sources),
+		"title", animeInfo.Title,
+		"episode", animeInfo.AllAnimeEpisodeNumber)
+
+	// Filter sources to only include supported types (S-mp4 and Luf-mp4)
+	var filteredSources []EpisodeSource
+	for _, source := range sources {
+		if strings.Contains(source.SourceName, "S-mp4") || strings.Contains(source.SourceName, "Luf-mp4") {
+			filteredSources = append(filteredSources, source)
+		}
+	}
+
+	log.Info("Filtered to supported sources",
+		"supported_count", len(filteredSources),
+		"filtered_out", len(sources)-len(filteredSources))
+
+	if len(filteredSources) == 0 {
+		log.Warn("No supported sources found for episode",
 			"allAnimeID", animeInfo.AllAnimeID,
 			"episodeNumber", animeInfo.AllAnimeEpisodeNumber)
-		return nil, fmt.Errorf("no sources found for episode %s", animeInfo.AllAnimeEpisodeNumber)
+		return nil, fmt.Errorf("no supported sources found for episode %s", animeInfo.AllAnimeEpisodeNumber)
 	}
 
 	// Sort sources by priority (highest first)
-	sort.Slice(sources, func(i, j int) bool {
-		return sources[i].Priority > sources[j].Priority
+	sort.Slice(filteredSources, func(i, j int) bool {
+		return filteredSources[i].Priority > filteredSources[j].Priority
 	})
-
-	log.Info("Retrieved episode sources",
-		"count", len(sources),
-		"title", animeInfo.Title,
-		"episode", animeInfo.AllAnimeEpisodeNumber)
 
 	return &EpisodeSourceInfo{
 		AnimeName:       animeInfo.Title,
 		EpisodeNumber:   animeInfo.AllAnimeEpisodeNumber,
 		AllAnimeID:      animeInfo.AllAnimeID,
-		Sources:         sources,
+		Sources:         filteredSources,
 		TranslationType: s.config.Player.TranslationType,
 	}, nil
+}
+
+// GetStreamURL decodes the source URL and fetches the actual streaming URL
+func (s *PlayerService) GetStreamURL(ctx context.Context, source EpisodeSource) (string, error) {
+	log.Debug("Getting stream URL for source", "sourceName", source.SourceName)
+
+	// Decode the source URL
+	decodedPath, err := s.decodeSourceURL(source.SourceURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to decode source URL: %w", err)
+	}
+
+	// Build the full API URL
+	apiURL := "https://allanime.day" + decodedPath
+	log.Debug("Decoded API URL", "url", apiURL)
+
+	// Fetch the stream URL from the API
+	streamURL, err := s.fetchStreamURL(ctx, apiURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch stream URL: %w", err)
+	}
+
+	log.Info("Retrieved stream URL", "sourceName", source.SourceName, "url", streamURL)
+	return streamURL, nil
+}
+
+// decodeSourceURL decodes an encoded source URL from allanime
+func (s *PlayerService) decodeSourceURL(encoded string) (string, error) {
+	// Check if the string starts with "--"
+	if len(encoded) < 2 || encoded[:2] != "--" {
+		return "", fmt.Errorf("encoded string does not start with '--': %s", encoded)
+	}
+
+	// Remove the "--" prefix
+	hexStr := encoded[2:]
+
+	var decodedBuilder strings.Builder
+
+	// Process each 2-character hex pair
+	for i := 0; i < len(hexStr); i += 2 {
+		if i+2 > len(hexStr) {
+			return "", fmt.Errorf("invalid hex pair at position %d", i)
+		}
+
+		pair := hexStr[i : i+2]
+		char := hexToChar(pair)
+
+		if char == 0 {
+			return "", fmt.Errorf("invalid hex pair: %s", pair)
+		}
+
+		decodedBuilder.WriteString(string(char))
+	}
+
+	decoded := decodedBuilder.String()
+
+	// Replace "/clock" with "/clock.json" if needed
+	decoded = strings.Replace(decoded, "/clock", "/clock.json", -1)
+
+	return decoded, nil
+}
+
+// hexToChar maps hex pairs to their character representation
+func hexToChar(pair string) rune {
+	switch pair {
+	case "01":
+		return '9'
+	case "08":
+		return '0'
+	case "05":
+		return '='
+	case "0a":
+		return '2'
+	case "0b":
+		return '3'
+	case "0c":
+		return '4'
+	case "07":
+		return '?'
+	case "00":
+		return '8'
+	case "5c":
+		return 'd'
+	case "0f":
+		return '7'
+	case "5e":
+		return 'f'
+	case "17":
+		return '/'
+	case "54":
+		return 'l'
+	case "09":
+		return '1'
+	case "48":
+		return 'p'
+	case "4f":
+		return 'w'
+	case "0e":
+		return '6'
+	case "5b":
+		return 'c'
+	case "5d":
+		return 'e'
+	case "0d":
+		return '5'
+	case "53":
+		return 'k'
+	case "1e":
+		return '&'
+	case "5a":
+		return 'b'
+	case "59":
+		return 'a'
+	case "4a":
+		return 'r'
+	case "4c":
+		return 't'
+	case "4e":
+		return 'v'
+	case "57":
+		return 'o'
+	case "51":
+		return 'i'
+	default:
+		return 0
+	}
+}
+
+// fetchStreamURL fetches the actual streaming URL from the decoded allanime URL
+func (s *PlayerService) fetchStreamURL(ctx context.Context, url string) (string, error) {
+	// Create an HTTP request
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// Set user agent to mimic a browser
+	req.Header.Set("User-Agent", allAnimeUserAgent)
+
+	// Execute the request
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to execute request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Read and parse the response
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	// Parse the JSON response
+	var response struct {
+		Links []struct {
+			Link string `json:"link"`
+			HLS  bool   `json:"hls"`
+		} `json:"links"`
+	}
+
+	if err := json.Unmarshal(body, &response); err != nil {
+		return "", fmt.Errorf("failed to parse JSON response: %w", err)
+	}
+
+	// Check if we have any links
+	if len(response.Links) == 0 {
+		return "", fmt.Errorf("no streaming links found in response")
+	}
+
+	// Return the first link (typically the best quality)
+	return response.Links[0].Link, nil
 }
