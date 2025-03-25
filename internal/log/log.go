@@ -52,3 +52,11 @@ func Error(msg string, args ...any) {
 		logger.Error(msg, args...)
 	}
 }
+
+// Trace logs at debug level, but only if trace logging is enabled.
+// This is a 'fake' trace level.
+func Trace(msg string, args ...any) {
+	if logger := DefaultLogger(); logger != nil && logger.traceEnabled {
+		logger.Debug("TRACE: "+msg, args...)
+	}
+}

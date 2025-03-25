@@ -5,12 +5,14 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // Logger provides an interface into the underlying logging system for Hisame's purposes.
 type Logger struct {
-	logger *slog.Logger
-	file   *os.File
+	logger       *slog.Logger
+	file         *os.File
+	traceEnabled bool
 }
 
 // Config contains logging information used to set up the logging framework
@@ -39,8 +41,9 @@ func New(config Config) (*Logger, error) {
 	handler := slog.NewJSONHandler(file, opts)
 
 	logger := &Logger{
-		logger: slog.New(handler),
-		file:   file,
+		logger:       slog.New(handler),
+		file:         file,
+		traceEnabled: strings.EqualFold(config.Level, "trace"),
 	}
 
 	return logger, nil
@@ -74,17 +77,10 @@ func (l *Logger) Error(msg string, args ...any) {
 	l.logger.Error(msg, args...)
 }
 
-// FatalExit logs a message at error Level and then terminated the application.
-func (l *Logger) FatalExit(msg string, err error, args ...any) {
-	l.logger.Error(msg, args...)
-	l.logger.Error("Fatal error.  Terminating application.")
-	os.Exit(1)
-}
-
 // parseLogLevel is a helper to convert a string log Level into the slog version.  Defaults to info if a matching log
 // Level cannot be found.
 func parseLogLevel(lvl string) slog.Level {
-	switch lvl {
+	switch strings.ToLower(lvl) {
 	case "debug":
 		return slog.LevelDebug
 	case "info":
@@ -93,6 +89,8 @@ func parseLogLevel(lvl string) slog.Level {
 		return slog.LevelWarn
 	case "error":
 		return slog.LevelError
+	case "trace":
+		return slog.LevelDebug // Trace level is handled by this log package instead of slog
 	default:
 		return slog.LevelInfo
 	}
