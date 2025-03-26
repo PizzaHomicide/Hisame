@@ -171,9 +171,54 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Delegate to anime list model to handle loading sources
 		return m.updateAnimeListView(msg)
 
-	case EpisodeSourcesLoadedMsg, EpisodeSourcesErrorMsg:
+	case EpisodeSourcesLoadedMsg:
 		// Delegate to anime list model
 		return m.updateAnimeListView(msg)
+
+	case PlaybackStartedMsg:
+		log.Info("Playback started",
+			"title", msg.EpisodeInfo.Title,
+			"episode", msg.EpisodeInfo.AllAnimeEpisodeNumber)
+
+		// Close any active modal
+		m.activeModal = ModalNone
+
+		// Disable loading state in anime list
+		m.animeListModel.DisableLoading()
+
+		return m, nil
+
+	case PlaybackEndedMsg:
+		log.Info("Playback ended",
+			"title", msg.EpisodeInfo.Title,
+			"episode", msg.EpisodeInfo.AllAnimeEpisodeNumber,
+			"progress", msg.Progress)
+
+		// Disable loading state in anime list if it's still active
+		m.animeListModel.DisableLoading()
+
+		return m, nil
+
+	case PlaybackErrorMsg:
+		log.Error("Playback error",
+			"title", msg.EpisodeInfo.Title,
+			"episode", msg.EpisodeInfo.AllAnimeEpisodeNumber,
+			"error", msg.Error)
+
+		// Disable loading state in anime list
+		m.animeListModel.DisableLoading()
+
+		return m, nil
+
+	case PlaybackProgressMsg:
+		// This is used for future progress tracking feature
+		// For now, we can log it at debug level but don't need UI updates
+		log.Debug("Playback progress",
+			"title", msg.EpisodeInfo.Title,
+			"episode", msg.EpisodeInfo.AllAnimeEpisodeNumber,
+			"progress", msg.Progress)
+
+		return m, nil
 
 	}
 

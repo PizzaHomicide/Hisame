@@ -9,7 +9,6 @@ import (
 	"github.com/PizzaHomicide/hisame/internal/log"
 	"io"
 	"net/http"
-	"os/exec"
 	"sort"
 	"strconv"
 	"strings"
@@ -442,58 +441,25 @@ func (s *PlayerService) fetchStreamURL(ctx context.Context, url string) (string,
 	return response.Links[0].Link, nil
 }
 
-// LaunchPlayer starts MPV (or configured player) with the given stream URL
-func (s *PlayerService) LaunchPlayer(streamURL string) error {
+// LaunchPlayer starts playback with the given stream URL and returns a channel for playback events
+func (s *PlayerService) LaunchPlayer(ctx context.Context, streamURL string) (<-chan PlaybackEvent, error) {
 	log.Info("Launching media player",
 		"player_type", s.config.Player.Type,
 		"player_path", s.config.Player.Path)
 
-	// Determine the player command
-	playerPath := s.config.Player.Path
-	if playerPath == "" {
-		// Default to "mpv" on PATH if not specified
-		playerPath = "mpv"
-	}
-
-	// Prepare command arguments
-	args := []string{}
-
-	// Add any additional configured arguments
-	if s.config.Player.Args != "" {
-		// Split the args string on spaces, respecting quotes
-		additionalArgs := parseArgs(s.config.Player.Args)
-		args = append(args, additionalArgs...)
-	}
-
-	// Add the stream URL as the final argument
-	args = append(args, streamURL)
-
-	log.Debug("Launching player command",
-		"path", playerPath,
-		"args", args)
-
-	// Create the command
-	cmd := exec.Command(playerPath, args...)
-
-	// Platform-specific process setup
-	setupPlayerProcess(cmd)
-
-	// Start the command without waiting for it to complete
-	err := cmd.Start()
+	// Create the appropriate video player based on config
+	videoPlayer, err := CreateVideoPlayer(s.config)
 	if err != nil {
-		return fmt.Errorf("failed to start player: %w", err)
+		return nil, fmt.Errorf("failed to create video player: %w", err)
 	}
 
-	// Platform-specific post-start process management
-	if err := releasePlayerProcess(cmd); err != nil {
-		log.Warn("Failed to release player process", "error", err)
-		// Continue anyway, as the player has been started
+	// Start playback and get the events channel
+	events, err := videoPlayer.Play(ctx, streamURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to start player: %w", err)
 	}
 
-	log.Info("Media player launched successfully",
-		"url", streamURL)
-
-	return nil
+	return events, nil
 }
 
 // parseArgs splits a string of command-line arguments, respecting quotes

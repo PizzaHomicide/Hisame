@@ -47,3 +47,25 @@ type EpisodeSourcesErrorMsg struct {
 	Error       error
 	EpisodeInfo player.AllAnimeEpisodeInfo
 }
+
+// PlaybackStartedMsg is sent when MPV playback has successfully started
+type PlaybackStartedMsg struct {
+	EpisodeInfo player.AllAnimeEpisodeInfo
+}
+
+// PlaybackEndedMsg is sent when MPV playback has ended
+type PlaybackEndedMsg struct {
+	EpisodeInfo player.AllAnimeEpisodeInfo
+	Progress    float64 // Percentage of playback completed
+}
+
+// PlaybackProgressMsg is sent to provide updates on playback progress
+type PlaybackProgressMsg struct {
+	EpisodeInfo player.AllAnimeEpisodeInfo
+	Progress    float64 // Percentage of playback completed
+}
+
+type PlaybackErrorMsg struct {
+	Error       error
+	EpisodeInfo player.AllAnimeEpisodeInfo
+}

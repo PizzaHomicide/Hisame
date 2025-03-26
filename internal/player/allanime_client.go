@@ -149,7 +149,6 @@ func (c *AllAnimeClient) SearchShows(ctx context.Context, query string, translat
 	// Set the user agent header
 	req.Header.Set("User-Agent", allAnimeUserAgent)
 
-	log.Debug("Before request")
 	// Execute the request
 	var response ShowSearchResponse
 	if err := c.client.Run(ctx, req, &response); err != nil {

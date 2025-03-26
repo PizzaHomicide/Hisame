@@ -250,7 +250,7 @@ func (m *AnimeListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		return m, nil
 
-	case EpisodeSourcesErrorMsg:
+	case PlaybackErrorMsg:
 		m.loading = false
 
 		log.Error("Failed to load episode sources",
@@ -756,7 +756,7 @@ func (m *AnimeListModel) loadEpisodes() tea.Cmd {
 		epResult, err := m.playerService.FindEpisodes(
 			ctx,
 			anime.ID,
-			anime.Title.English,
+			anime.Title.Native,
 			anime.Synonyms,
 		)
 
@@ -783,7 +783,7 @@ func (m *AnimeListModel) loadNextEpisode(nextEpNumber int) tea.Cmd {
 		eps, err := m.playerService.FindEpisodes(
 			ctx,
 			anime.ID,
-			anime.Title.English,
+			anime.Title.Native,
 			anime.Synonyms,
 		)
 
@@ -825,14 +825,14 @@ func (m *AnimeListModel) DisableLoading() {
 	m.loading = false
 }
 
-// playEpisode loads the sources for the selected episode and prepares to play it
 func (m *AnimeListModel) playEpisode(episode player.AllAnimeEpisodeInfo) tea.Cmd {
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
+		// Create a context with timeout for the entire operation
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel() // This ensures the main context is always canceled
 
-		// Log that we're attempting to play this episode
-		log.Info("Attempting to play episode",
+		// Set loading state for source fetching
+		log.Info("Fetching sources for episode",
 			"title", episode.Title,
 			"overall_epNum", episode.OverallEpisodeNumber,
 			"allanime_epNum", episode.AllAnimeEpisodeNumber)
@@ -879,12 +879,19 @@ func (m *AnimeListModel) playEpisode(episode player.AllAnimeEpisodeInfo) tea.Cmd
 
 		// Log the URL that would be used to play the episode
 		log.Info("Found playable stream URL",
-			"source_name", successSource.SourceName,
-			"url", streamURL)
+			"source_name", successSource.SourceName)
 
-		// Launch the player with the stream URL
-		err = m.playerService.LaunchPlayer(streamURL)
+		// Update loading message to indicate we're starting the player
+		m.loadingMsg = fmt.Sprintf("Launching media player for %s episode %s...",
+			episode.Title, episode.AllAnimeEpisodeNumber)
+
+		// Create a new context for the playback monitoring that's independent of this function
+		playbackCtx, playbackCancel := context.WithCancel(context.Background())
+
+		// Launch the player with the stream URL and get the event channel
+		eventCh, err := m.playerService.LaunchPlayer(playbackCtx, streamURL)
 		if err != nil {
+			playbackCancel() // Clean up the playback context if launch fails
 			log.Error("Failed to launch media player", "error", err)
 			return EpisodeSourcesErrorMsg{
 				Error:       fmt.Errorf("failed to launch player: %w", err),
@@ -892,13 +899,88 @@ func (m *AnimeListModel) playEpisode(episode player.AllAnimeEpisodeInfo) tea.Cmd
 			}
 		}
 
-		// TODO: Update the anime progress after successful playback
-		// This would be implemented later when we add MPV progress tracking
+		// Update loading message to indicate we're waiting for playback to start
+		m.loadingMsg = fmt.Sprintf("Waiting for playback to start for %s episode %s...",
+			episode.Title, episode.AllAnimeEpisodeNumber)
 
-		return EpisodeSourcesLoadedMsg{
-			Sources:     sources,
-			EpisodeInfo: episode,
-			StreamURL:   streamURL,
+		// Wait for the first event (should be playback started or an error)
+		select {
+		case <-ctx.Done():
+			playbackCancel() // Clean up the playback context on timeout
+			return PlaybackErrorMsg{
+				Error:       fmt.Errorf("timeout waiting for playback to start"),
+				EpisodeInfo: episode,
+			}
+		case event, ok := <-eventCh:
+			if !ok {
+				playbackCancel() // Clean up the playback context on channel close
+				return PlaybackErrorMsg{
+					Error:       fmt.Errorf("player event channel closed unexpectedly"),
+					EpisodeInfo: episode,
+				}
+			}
+
+			// Handle the event based on its type
+			switch event.Type {
+			case player.PlaybackStarted:
+				log.Info("MPV playback started successfully")
+
+				// Start another goroutine to continue monitoring playback progress
+				go func() {
+					defer playbackCancel() // Ensure context is canceled when goroutine exits
+
+					for event := range eventCh {
+						switch event.Type {
+						case player.PlaybackEnded:
+							log.Info("MPV playback ended")
+							// TODO: Update the anime progress after successful playback
+							return
+						case player.PlaybackError:
+							log.Error("MPV playback error", "error", event.Error)
+							return
+						case player.PlaybackProgress:
+							// Log progress updates less frequently to avoid spam
+							if int(event.Progress)%2 == 0 {
+								log.Debug("MPV playback progress", "progress", event.Progress)
+							}
+						}
+					}
+					log.Debug("MPV event channel closed, stopping monitoring")
+				}()
+
+				// Return a message indicating playback has started
+				return PlaybackStartedMsg{
+					EpisodeInfo: episode,
+				}
+
+			case player.PlaybackError:
+				playbackCancel() // Clean up the playback context on error
+				log.Error("MPV failed to start playback", "error", event.Error)
+				return PlaybackErrorMsg{
+					Error:       event.Error,
+					EpisodeInfo: episode,
+				}
+			default:
+				log.Warn("Unexpected initial event from MPV", "event_type", event.Type)
+				// Treat as started anyway to be safe
+				go func() {
+					defer playbackCancel() // Ensure context is canceled when goroutine exits
+
+					for event := range eventCh {
+						switch event.Type {
+						case player.PlaybackEnded:
+							log.Info("MPV playback ended")
+							return
+						case player.PlaybackError:
+							log.Error("MPV playback error", "error", event.Error)
+							return
+						}
+					}
+				}()
+				return PlaybackStartedMsg{
+					EpisodeInfo: episode,
+				}
+			}
 		}
 	}
 }
