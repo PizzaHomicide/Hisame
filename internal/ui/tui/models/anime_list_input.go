@@ -54,16 +54,17 @@ func (m *AnimeListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case AnimeListLoadedMsg:
-		log.Debug("Anime list loaded")
-		m.loading = false
-		m.allAnime = m.animeService.GetAnimeList()
-		m.applyFilters()
-
-	case AnimeListErrorMsg:
-		log.Debug("Anime list load error", "error", msg.Error)
-		m.loading = false
-		m.loadError = msg.Error
+	case AnimeListMsg:
+		if msg.Success {
+			log.Debug("Anime list loaded")
+			m.loading = false
+			m.allAnime = m.animeService.GetAnimeList()
+			m.applyFilters()
+		} else {
+			log.Debug("Anime list load error", "error", msg.Error)
+			m.loading = false
+			m.loadError = msg.Error
+		}
 	}
 
 	// Handle other message types in the playback file

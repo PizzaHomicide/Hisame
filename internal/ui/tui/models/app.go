@@ -81,9 +81,12 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+l":
 			log.Info("Logging out.  Cleaning up token from config file...")
 			m.config.Auth.Token = ""
-			config.UpdateConfig(func(conf *config.Config) {
+			err := config.UpdateConfig(func(conf *config.Config) {
 				conf.Auth.Token = ""
 			})
+			if err != nil {
+				log.Warn("Error cleaning up token from config file.  May need to manually edit config to remove the token", "error", err)
+			}
 			// Throw back to login screen
 			m.authModel.Reset()
 			m.activeView = ViewAuth
@@ -117,109 +120,149 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.animeListModel.Resize(msg.Width, msg.Height)
 		m.episodeSelectModel.Resize(msg.Width, msg.Height)
 
-	case EpisodeLoadedMsg:
-		if len(msg.Episodes) == 0 {
-			log.Warn("No episodes found for anime", "title", msg.Title)
+	case EpisodeMsg:
+		switch msg.Type {
+		case EpisodeEventLoaded:
+			if len(msg.Episodes) == 0 {
+				log.Warn("No episodes found for anime", "title", msg.Title)
+				return m, nil
+			}
+
+			log.Info("Episodes loaded", "count", len(msg.Episodes), "title", msg.Title)
+
+			// Set the episodes in the model
+			m.episodeSelectModel.SetEpisodes(msg.Episodes, msg.Title)
+
+			// Activate the episode selection modal
+			m.activeModal = ModalEpisodeSelect
+
+			m.animeListModel.DisableLoading()
+
+			return m, nil
+
+		case EpisodeEventError:
+			log.Error("Failed to load episodes", "error", msg.Error)
+			// Could display an error notification here
+			return m, nil
+
+		case EpisodeEventSelected:
+			// An episode was selected from the modal
+			if msg.Episode != nil {
+				log.Info("Episode selected to play",
+					"overall_epNum", msg.Episode.OverallEpisodeNumber,
+					"allanime_epNum", msg.Episode.AllAnimeEpisodeNumber,
+					"allanime_id", msg.Episode.AllAnimeID,
+					"title", msg.Episode.Title)
+
+				// Close the modal
+				m.activeModal = ModalNone
+
+				// Delegate to anime list model to handle playing
+				return m.updateAnimeListView(msg)
+			}
 			return m, nil
 		}
 
-		log.Info("Episodes loaded", "count", len(msg.Episodes), "title", msg.Title)
-
-		// Set the episodes in the model
-		m.episodeSelectModel.SetEpisodes(msg.Episodes, msg.Title)
-
-		// Activate the episode selection modal
-		m.activeModal = ModalEpisodeSelect
-
-		m.animeListModel.DisableLoading()
-
-		return m, nil
-
-	case EpisodeLoadErrorMsg:
-		log.Error("Failed to load episodes", "error", msg.Error)
-		// Could display an error notification here
-		return m, nil
-
-	case EpisodeSelectMsg:
-		// An episode was selected from the modal
-		if msg.Episode != nil {
-			log.Info("Episode selected to play",
+	case PlaybackMsg:
+		switch msg.Type {
+		case PlaybackEventEpisodeFound:
+			log.Info("Next episode found in app model",
+				"title", msg.Episode.Title,
 				"overall_epNum", msg.Episode.OverallEpisodeNumber,
 				"allanime_epNum", msg.Episode.AllAnimeEpisodeNumber,
 				"allanime_id", msg.Episode.AllAnimeID,
-				"title", msg.Episode.Title)
+			)
+			// Close any active modal
+			m.activeModal = ModalNone
+			m.animeListModel.DisableLoading()
 
-			// Close the modal
+			// Delegate to anime list model to handle loading sources
+			return m.updateAnimeListView(msg)
+
+		case PlaybackEventSourcesLoaded:
+			// Delegate to anime list model
+			return m.updateAnimeListView(msg)
+
+		case PlaybackEventStarted:
+			log.Info("Playback started",
+				"title", msg.Episode.Title,
+				"episode", msg.Episode.AllAnimeEpisodeNumber)
+
+			// Close any active modal
 			m.activeModal = ModalNone
 
-			// Delegate to anime list model to handle playing
-			return m.updateAnimeListView(msg)
+			// Disable loading state in anime list
+			m.animeListModel.DisableLoading()
+
+			return m, nil
+
+		case PlaybackEventEnded:
+			log.Info("Playback ended",
+				"title", msg.Episode.Title,
+				"episode", msg.Episode.AllAnimeEpisodeNumber,
+				"progress", msg.Progress)
+
+			// Disable loading state in anime list if it's still active
+			m.animeListModel.DisableLoading()
+
+			return m, nil
+
+		case PlaybackEventError:
+			log.Error("Playback error",
+				"title", msg.Episode.Title,
+				"episode", msg.Episode.AllAnimeEpisodeNumber,
+				"error", msg.Error)
+
+			// Disable loading state in anime list
+			m.animeListModel.DisableLoading()
+
+			return m, nil
+
+		case PlaybackEventProgress:
+			// This is used for future progress tracking feature
+			// For now, we can log it at debug level but don't need UI updates
+			log.Debug("Playback progress",
+				"title", msg.Episode.Title,
+				"episode", msg.Episode.AllAnimeEpisodeNumber,
+				"progress", msg.Progress)
+
+			return m, nil
 		}
-		return m, nil
 
-	case NextEpisodeFoundMsg:
-		log.Info("Next episode found in app model",
-			"title", msg.Episode.Title,
-			"overall_epNum", msg.Episode.OverallEpisodeNumber,
-			"allanime_epNum", msg.Episode.AllAnimeEpisodeNumber,
-			"allanime_id", msg.Episode.AllAnimeID,
-		)
-		// Close any active modal
-		m.activeModal = ModalNone
-		m.animeListModel.DisableLoading()
+	case AuthMsg:
+		if m.activeView == ViewAuth {
+			if msg.Success {
+				log.Info("Authentication successful")
+				m.config.Auth.Token = msg.Token
+				err := config.UpdateConfig(func(conf *config.Config) {
+					conf.Auth.Token = msg.Token
+				})
+				if err != nil {
+					log.Warn("Error saving auth token to config. Will need to reauthenticate when Hisame opens next", "error", err)
+				}
+				m.authModel.Reset()
 
-		// Delegate to anime list model to handle loading sources
-		return m.updateAnimeListView(msg)
+				// Initialize AniList client and services
+				client, err := anilist.NewClient(msg.Token)
+				if err != nil {
+					log.Error("Failed to create AniList client after authentication", "error", err)
+					return m, tea.Quit
+				}
 
-	case EpisodeSourcesLoadedMsg:
-		// Delegate to anime list model
-		return m.updateAnimeListView(msg)
+				animeRepo := anilist.NewAnimeRepository(client)
+				m.animeService = service.NewAnimeService(animeRepo)
+				m.animeListModel = NewAnimeListModel(m.config, m.animeService)
+				m.animeListModel.Resize(m.width, m.height)
+				m.activeView = ViewAnimeList
 
-	case PlaybackStartedMsg:
-		log.Info("Playback started",
-			"title", msg.EpisodeInfo.Title,
-			"episode", msg.EpisodeInfo.AllAnimeEpisodeNumber)
-
-		// Close any active modal
-		m.activeModal = ModalNone
-
-		// Disable loading state in anime list
-		m.animeListModel.DisableLoading()
-
-		return m, nil
-
-	case PlaybackEndedMsg:
-		log.Info("Playback ended",
-			"title", msg.EpisodeInfo.Title,
-			"episode", msg.EpisodeInfo.AllAnimeEpisodeNumber,
-			"progress", msg.Progress)
-
-		// Disable loading state in anime list if it's still active
-		m.animeListModel.DisableLoading()
-
-		return m, nil
-
-	case PlaybackErrorMsg:
-		log.Error("Playback error",
-			"title", msg.EpisodeInfo.Title,
-			"episode", msg.EpisodeInfo.AllAnimeEpisodeNumber,
-			"error", msg.Error)
-
-		// Disable loading state in anime list
-		m.animeListModel.DisableLoading()
-
-		return m, nil
-
-	case PlaybackProgressMsg:
-		// This is used for future progress tracking feature
-		// For now, we can log it at debug level but don't need UI updates
-		log.Debug("Playback progress",
-			"title", msg.EpisodeInfo.Title,
-			"episode", msg.EpisodeInfo.AllAnimeEpisodeNumber,
-			"progress", msg.Progress)
-
-		return m, nil
-
+				return m, m.animeListModel.Init()
+			} else {
+				log.Error("Authentication failed", "error", msg.Error)
+				m.authModel.Reset()
+				// TODO: Add better error handling when auth fails
+				return m, tea.Quit
+			}
+		}
 	}
 
 	// Prioritise delegating messages to a modal if one is active
@@ -262,37 +305,39 @@ func (m AppModel) View() string {
 // updateAuthView delegates message processing to
 func (m AppModel) updateAuthView(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Any messages that require orchestration/view changing specific to the auth view
-	switch typedMsg := msg.(type) {
-	case AuthCompletedMsg:
-		log.Info("Authentication successful")
-		m.config.Auth.Token = typedMsg.Token
-		err := config.UpdateConfig(func(conf *config.Config) {
-			conf.Auth.Token = typedMsg.Token
-		})
-		if err != nil {
-			log.Warn("Error saving auth token to config.  Will need to reauthenticate when Hisame opens next", "error", err)
-		}
-		m.authModel.Reset()
+	switch msg := msg.(type) {
+	case AuthMsg:
+		if msg.Success {
+			log.Info("Authentication successful")
+			m.config.Auth.Token = msg.Token
+			err := config.UpdateConfig(func(conf *config.Config) {
+				conf.Auth.Token = msg.Token
+			})
+			if err != nil {
+				log.Warn("Error saving auth token to config. Will need to reauthenticate when Hisame opens next", "error", err)
+			}
+			m.authModel.Reset()
 
-		// Initialize AniList client and services
-		client, err := anilist.NewClient(typedMsg.Token)
-		if err != nil {
-			log.Error("Failed to create AniList client after authentication", "error", err)
+			// Initialize AniList client and services
+			client, err := anilist.NewClient(msg.Token)
+			if err != nil {
+				log.Error("Failed to create AniList client after authentication", "error", err)
+				return m, tea.Quit
+			}
+
+			animeRepo := anilist.NewAnimeRepository(client)
+			m.animeService = service.NewAnimeService(animeRepo)
+			m.animeListModel = NewAnimeListModel(m.config, m.animeService)
+			m.animeListModel.Resize(m.width, m.height)
+			m.activeView = ViewAnimeList
+
+			return m, m.animeListModel.Init()
+		} else {
+			log.Error("Authentication failed", "error", msg.Error)
+			m.authModel.Reset()
+			// TODO: Add better error handling when auth fails
 			return m, tea.Quit
 		}
-
-		animeRepo := anilist.NewAnimeRepository(client)
-		m.animeService = service.NewAnimeService(animeRepo)
-		m.animeListModel = NewAnimeListModel(m.config, m.animeService)
-		m.animeListModel.Resize(m.width, m.height)
-		m.activeView = ViewAnimeList
-
-		return m, m.animeListModel.Init()
-	case AuthFailedMsg:
-		log.Error("Authentication failed", "error", typedMsg.Error)
-		m.authModel.Reset()
-		// TODO:  Add better error handling when auth fails
-		return m, tea.Quit
 	}
 
 	// Delegate other messages to the model

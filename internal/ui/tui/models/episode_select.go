@@ -117,7 +117,10 @@ func (m *EpisodeSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			selectedEp := m.GetSelectedEpisode()
 			if selectedEp != nil {
 				return m, func() tea.Msg {
-					return EpisodeSelectMsg{Episode: selectedEp}
+					return EpisodeMsg{
+						Type:    EpisodeEventSelected,
+						Episode: selectedEp,
+					}
 				}
 			}
 

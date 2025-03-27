@@ -99,11 +99,16 @@ func loadAnimeList(animeService *service.AnimeService) tea.Cmd {
 
 		if err := animeService.LoadAnimeList(ctx); err != nil {
 			log.Error("Failed to load anime list", "error", err)
-			return AnimeListErrorMsg{Error: err}
+			return AnimeListMsg{
+				Success: false,
+				Error:   err,
+			}
 		}
 
 		log.Info("Anime list loaded successfully. Sending AnimeListLoadedMsg")
-		return AnimeListLoadedMsg{}
+		return AnimeListMsg{
+			Success: true,
+		}
 	}
 }
 

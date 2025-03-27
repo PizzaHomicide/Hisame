@@ -17,74 +17,16 @@ import (
 // handlePlaybackMessages handles all playback-related messages
 func (m *AnimeListModel) handlePlaybackMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case NextEpisodeFoundMsg:
-		log.Info("Next episode found, loading sources",
-			"title", msg.Episode.Title,
-			"overall_epNum", msg.Episode.OverallEpisodeNumber,
-			"allanime_epNum", msg.Episode.AllAnimeEpisodeNumber,
-			"allanime_id", msg.Episode.AllAnimeID)
-
-		// Start loading the sources for this episode
-		m.loading = true
-		m.loadingMsg = fmt.Sprintf("Loading sources for episode %s of %s...",
-			msg.Episode.AllAnimeEpisodeNumber,
-			msg.Episode.Title)
-
-		return m, tea.Batch(
-			m.spinner.Tick,
-			m.playEpisode(msg.Episode),
-		)
-
-	case EpisodeSourcesLoadedMsg:
-		m.loading = false
-
-		log.Info("Episode sources loaded successfully",
-			"title", msg.EpisodeInfo.Title,
-			"episode", msg.EpisodeInfo.AllAnimeEpisodeNumber,
-			"source_count", len(msg.Sources.Sources))
-
-		// Log details about each source
-		for i, source := range msg.Sources.Sources {
-			log.Debug("Source option",
-				"index", i,
-				"name", source.SourceName,
-				"priority", source.Priority,
-				"type", source.Type,
-				"has_download", source.Downloads != nil)
-		}
-
-		// At this point, we would normally launch the player
-		// For now, just log that we would play the highest priority source
-		if len(msg.Sources.Sources) > 0 {
-			bestSource := msg.Sources.Sources[0] // Already sorted by priority
-			log.Info("Would play this source (highest priority)",
-				"name", bestSource.SourceName,
-				"priority", bestSource.Priority,
-				"type", bestSource.Type,
-				"url", msg.StreamURL)
-		}
-
-		return m, nil
-
-	case PlaybackErrorMsg:
-		m.loading = false
-
-		log.Error("Failed to load episode sources",
-			"title", msg.EpisodeInfo.Title,
-			"episode", msg.EpisodeInfo.AllAnimeEpisodeNumber,
-			"error", msg.Error)
-
-		return m, nil
-
-	case EpisodeSelectMsg:
-		if msg.Episode != nil {
-			log.Info("Episode selected from modal",
+	case PlaybackMsg:
+		switch msg.Type {
+		case PlaybackEventEpisodeFound:
+			log.Info("Next episode found, loading sources",
+				"title", msg.Episode.Title,
 				"overall_epNum", msg.Episode.OverallEpisodeNumber,
 				"allanime_epNum", msg.Episode.AllAnimeEpisodeNumber,
-				"allanime_id", msg.Episode.AllAnimeID,
-				"title", msg.Episode.Title)
+				"allanime_id", msg.Episode.AllAnimeID)
 
-			// Start loading the sources
+			// Start loading the sources for this episode
 			m.loading = true
 			m.loadingMsg = fmt.Sprintf("Loading sources for episode %s of %s...",
 				msg.Episode.AllAnimeEpisodeNumber,
@@ -92,8 +34,94 @@ func (m *AnimeListModel) handlePlaybackMessages(msg tea.Msg) (tea.Model, tea.Cmd
 
 			return m, tea.Batch(
 				m.spinner.Tick,
-				m.playEpisode(*msg.Episode),
+				m.playEpisode(msg.Episode),
 			)
+
+		case PlaybackEventSourcesLoaded:
+			m.loading = false
+
+			log.Info("Episode sources loaded successfully",
+				"title", msg.Episode.Title,
+				"episode", msg.Episode.AllAnimeEpisodeNumber,
+				"source_count", len(msg.Sources.Sources))
+
+			// Log details about each source
+			for i, source := range msg.Sources.Sources {
+				log.Debug("Source option",
+					"index", i,
+					"name", source.SourceName,
+					"priority", source.Priority,
+					"type", source.Type,
+					"has_download", source.Downloads != nil)
+			}
+
+			// At this point, we would normally launch the player
+			// For now, just log that we would play the highest priority source
+			if len(msg.Sources.Sources) > 0 {
+				bestSource := msg.Sources.Sources[0] // Already sorted by priority
+				log.Info("Would play this source (highest priority)",
+					"name", bestSource.SourceName,
+					"priority", bestSource.Priority,
+					"type", bestSource.Type,
+					"url", msg.StreamURL)
+			}
+
+			return m, nil
+
+		case PlaybackEventError:
+			m.loading = false
+
+			log.Error("Failed to load episode sources",
+				"title", msg.Episode.Title,
+				"episode", msg.Episode.AllAnimeEpisodeNumber,
+				"error", msg.Error)
+
+			return m, nil
+
+		case PlaybackEventStarted:
+			m.loading = false
+			log.Info("Playback started",
+				"title", msg.Episode.Title,
+				"episode", msg.Episode.AllAnimeEpisodeNumber)
+			return m, nil
+
+		case PlaybackEventEnded:
+			m.loading = false
+			log.Info("Playback ended",
+				"title", msg.Episode.Title,
+				"episode", msg.Episode.AllAnimeEpisodeNumber,
+				"progress", msg.Progress)
+			return m, nil
+
+		case PlaybackEventProgress:
+			log.Debug("Playback progress",
+				"title", msg.Episode.Title,
+				"episode", msg.Episode.AllAnimeEpisodeNumber,
+				"progress", msg.Progress)
+			return m, nil
+		}
+
+	case EpisodeMsg:
+		switch msg.Type {
+		case EpisodeEventSelected:
+			if msg.Episode != nil {
+				log.Info("Episode selected from modal",
+					"overall_epNum", msg.Episode.OverallEpisodeNumber,
+					"allanime_epNum", msg.Episode.AllAnimeEpisodeNumber,
+					"allanime_id", msg.Episode.AllAnimeID,
+					"title", msg.Episode.Title)
+
+				// Start loading the sources
+				m.loading = true
+				m.loadingMsg = fmt.Sprintf("Loading sources for episode %s of %s...",
+					msg.Episode.AllAnimeEpisodeNumber,
+					msg.Episode.Title)
+
+				return m, tea.Batch(
+					m.spinner.Tick,
+					m.playEpisode(*msg.Episode),
+				)
+			}
 		}
 	}
 
@@ -117,10 +145,14 @@ func (m *AnimeListModel) loadEpisodes() tea.Cmd {
 
 		if err != nil {
 			log.Error("Failed to get episodes", "error", err)
-			return EpisodeLoadErrorMsg{Error: err}
+			return EpisodeMsg{
+				Type:  EpisodeEventError,
+				Error: err,
+			}
 		}
 
-		return EpisodeLoadedMsg{
+		return EpisodeMsg{
+			Type:     EpisodeEventLoaded,
 			Episodes: epResult.Episodes,
 			Title:    anime.Title.Preferred(m.config.UI.TitleLanguage),
 		}
@@ -144,7 +176,10 @@ func (m *AnimeListModel) loadNextEpisode(nextEpNumber int) tea.Cmd {
 
 		if err != nil {
 			log.Error("Failed to get episodes", "error", err)
-			return EpisodeLoadErrorMsg{Error: err}
+			return EpisodeMsg{
+				Type:  EpisodeEventError,
+				Error: err,
+			}
 		}
 
 		// Find the specific episode we want
@@ -158,7 +193,8 @@ func (m *AnimeListModel) loadNextEpisode(nextEpNumber int) tea.Cmd {
 
 		if selectedEp == nil {
 			log.Error("Could not find next episode", "nextEp", nextEpNumber)
-			return EpisodeLoadErrorMsg{
+			return EpisodeMsg{
+				Type:  EpisodeEventError,
 				Error: fmt.Errorf("could not find episode %d", nextEpNumber),
 			}
 		}
@@ -170,7 +206,8 @@ func (m *AnimeListModel) loadNextEpisode(nextEpNumber int) tea.Cmd {
 			"allanime_id", selectedEp.AllAnimeID,
 			"anilist_id", selectedEp.AniListID)
 
-		return NextEpisodeFoundMsg{
+		return PlaybackMsg{
+			Type:    PlaybackEventEpisodeFound,
 			Episode: *selectedEp,
 		}
 	}
@@ -193,9 +230,10 @@ func (m *AnimeListModel) playEpisode(episode player.AllAnimeEpisodeInfo) tea.Cmd
 		sources, err := m.playerService.GetEpisodeSources(ctx, episode)
 		if err != nil {
 			log.Error("Failed to get episode sources", "error", err)
-			return EpisodeSourcesErrorMsg{
-				Error:       err,
-				EpisodeInfo: episode,
+			return PlaybackMsg{
+				Type:    PlaybackEventError,
+				Error:   err,
+				Episode: episode,
 			}
 		}
 
@@ -223,9 +261,10 @@ func (m *AnimeListModel) playEpisode(episode player.AllAnimeEpisodeInfo) tea.Cmd
 		}
 
 		if streamURL == "" {
-			return EpisodeSourcesErrorMsg{
-				Error:       fmt.Errorf("failed to get playable URL from any source"),
-				EpisodeInfo: episode,
+			return PlaybackMsg{
+				Type:    PlaybackEventError,
+				Error:   fmt.Errorf("failed to get playable URL from any source"),
+				Episode: episode,
 			}
 		}
 
@@ -245,9 +284,10 @@ func (m *AnimeListModel) playEpisode(episode player.AllAnimeEpisodeInfo) tea.Cmd
 		if err != nil {
 			playbackCancel() // Clean up the playback context if launch fails
 			log.Error("Failed to launch media player", "error", err)
-			return EpisodeSourcesErrorMsg{
-				Error:       fmt.Errorf("failed to launch player: %w", err),
-				EpisodeInfo: episode,
+			return PlaybackMsg{
+				Type:    PlaybackEventError,
+				Error:   fmt.Errorf("failed to launch player: %w", err),
+				Episode: episode,
 			}
 		}
 
@@ -259,16 +299,18 @@ func (m *AnimeListModel) playEpisode(episode player.AllAnimeEpisodeInfo) tea.Cmd
 		select {
 		case <-ctx.Done():
 			playbackCancel() // Clean up the playback context on timeout
-			return PlaybackErrorMsg{
-				Error:       fmt.Errorf("timeout waiting for playback to start"),
-				EpisodeInfo: episode,
+			return PlaybackMsg{
+				Type:    PlaybackEventError,
+				Error:   fmt.Errorf("timeout waiting for playback to start"),
+				Episode: episode,
 			}
 		case event, ok := <-eventCh:
 			if !ok {
 				playbackCancel() // Clean up the playback context on channel close
-				return PlaybackErrorMsg{
-					Error:       fmt.Errorf("player event channel closed unexpectedly"),
-					EpisodeInfo: episode,
+				return PlaybackMsg{
+					Type:    PlaybackEventError,
+					Error:   fmt.Errorf("player event channel closed unexpectedly"),
+					Episode: episode,
 				}
 			}
 
@@ -301,18 +343,21 @@ func (m *AnimeListModel) playEpisode(episode player.AllAnimeEpisodeInfo) tea.Cmd
 				}()
 
 				// Return a message indicating playback has started
-				return PlaybackStartedMsg{
-					EpisodeInfo: episode,
+				return PlaybackMsg{
+					Type:    PlaybackEventStarted,
+					Episode: episode,
 				}
 
 			case player.PlaybackError:
 				playbackCancel() // Clean up the playback context on error
 				log.Error("MPV failed to start playback", "error", event.Error)
-				return PlaybackErrorMsg{
-					Error:       event.Error,
-					EpisodeInfo: episode,
+				return PlaybackMsg{
+					Type:    PlaybackEventError,
+					Error:   event.Error,
+					Episode: episode,
 				}
 			default:
+				// TODO:  I don't think I want this.  Let's just report an error playback message, but indicate it _may_ have worked, but monitoring will be unavailable.
 				log.Warn("Unexpected initial event from MPV", "event_type", event.Type)
 				// Treat as started anyway to be safe
 				go func() {
@@ -329,8 +374,9 @@ func (m *AnimeListModel) playEpisode(episode player.AllAnimeEpisodeInfo) tea.Cmd
 						}
 					}
 				}()
-				return PlaybackStartedMsg{
-					EpisodeInfo: episode,
+				return PlaybackMsg{
+					Type:    PlaybackEventStarted,
+					Episode: episode,
 				}
 			}
 		}

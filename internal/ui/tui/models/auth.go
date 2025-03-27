@@ -61,10 +61,16 @@ func (m *AuthModel) startAuth() tea.Cmd {
 		m.authInProgress = false
 
 		if result.Error != nil {
-			return AuthFailedMsg{Error: result.Error.Error()}
+			return AuthMsg{
+				Success: false,
+				Error:   result.Error.Error(),
+			}
 		}
 
-		return AuthCompletedMsg{Token: result.Token}
+		return AuthMsg{
+			Success: true,
+			Token:   result.Token,
+		}
 	}
 }
 
