@@ -2,10 +2,13 @@ package anilist
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/PizzaHomicide/hisame/internal/domain"
 	"github.com/PizzaHomicide/hisame/internal/log"
 	"github.com/machinebox/graphql"
+	"net/url"
+	"strings"
 	"time"
 )
 
@@ -58,6 +61,19 @@ func (c *Client) Query(ctx context.Context, query string, variables map[string]i
 	return c.client.Run(ctx, req, result)
 }
 
+type NetworkError struct {
+	Err error
+}
+
+func (e NetworkError) Error() string {
+	return fmt.Sprintf("network error: %v", e.Err)
+}
+
+func (e NetworkError) Unwrap() error {
+	return e.Err
+}
+
+// Update the fetchUserProfile method to detect network errors
 func (c *Client) fetchUserProfile(ctx context.Context) (*domain.User, error) {
 	query := `
         query {
@@ -106,6 +122,14 @@ func (c *Client) fetchUserProfile(ctx context.Context) (*domain.User, error) {
 	}
 
 	if err := c.Query(ctx, query, nil, &response); err != nil {
+		// Check if this is a network error
+		var netErr *url.Error
+		if errors.As(err, &netErr) && (netErr.Timeout() || netErr.Temporary() ||
+			strings.Contains(err.Error(), "connection refused") ||
+			strings.Contains(err.Error(), "no such host") ||
+			strings.Contains(err.Error(), "i/o timeout")) {
+			return nil, NetworkError{Err: err}
+		}
 		return nil, fmt.Errorf("failed to fetch user profile: %w", err)
 	}
 

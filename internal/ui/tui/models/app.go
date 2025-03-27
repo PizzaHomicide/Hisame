@@ -1,12 +1,14 @@
 package models
 
 import (
+	"errors"
 	"fmt"
 	"github.com/PizzaHomicide/hisame/internal/config"
 	"github.com/PizzaHomicide/hisame/internal/log"
 	"github.com/PizzaHomicide/hisame/internal/repository/anilist"
 	"github.com/PizzaHomicide/hisame/internal/service"
 	tea "github.com/charmbracelet/bubbletea"
+	"os"
 )
 
 // AppModel is the main application model that coordinates all child models.  It is the high level wrapper.
@@ -35,14 +37,31 @@ func NewAppModel(cfg *config.Config) AppModel {
 		log.Info("Token found in config file.  Testing it to see if still valid")
 		client, err := anilist.NewClient(cfg.Auth.Token)
 		if err != nil {
-			log.Warn("Failed to create anilist client with token from config.  Reauthentication required")
-			initialView = ViewAuth
+			// Check if it's a network error
+			var netErr anilist.NetworkError
+			if errors.As(err, &netErr) {
+				// Network error - print message and exit without clearing token
+				errorMsg := fmt.Sprintf("Network error while connecting to AniList: %v\n", netErr.Err)
+				errorMsg += "Please check your internet connection and try again.\n"
+
+				// Log the error
+				log.Error("Network error during startup", "error", netErr.Err)
+
+				// Print to stderr for user to see
+				_, _ = fmt.Fprintln(os.Stderr, errorMsg)
+
+				// Exit with error code
+				os.Exit(1)
+			} else {
+				// It's an invalid token error
+				log.Warn("Invalid token in config. Reauthentication required", "error", err)
+				initialView = ViewAuth
+			}
 		} else {
-			// Client initialised correct, so we can bypass auth.
+			// Client initialized correctly, so we can bypass auth
 			animeRepo := anilist.NewAnimeRepository(client)
 			animeService = service.NewAnimeService(animeRepo)
 			initialView = ViewAnimeList
-
 		}
 	} else {
 		initialView = ViewAuth
