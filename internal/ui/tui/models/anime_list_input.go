@@ -14,7 +14,7 @@ import (
 )
 
 // Update handles messages and updates the model
-func (m *AnimeListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *AnimeListModel) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		// If in search mode, handle input differently
@@ -72,7 +72,7 @@ func (m *AnimeListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // handleKeyPress processes keyboard inputs in normal mode
-func (m *AnimeListModel) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *AnimeListModel) handleKeyPress(msg tea.KeyMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "up", "k":
 		if m.cursor > 0 {
@@ -121,7 +121,7 @@ func (m *AnimeListModel) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // handlePlayEpisode initiates playback of the next episode
-func (m *AnimeListModel) handlePlayEpisode() (tea.Model, tea.Cmd) {
+func (m *AnimeListModel) handlePlayEpisode() (Model, tea.Cmd) {
 	nextEpNumber := m.getSelectedAnime().UserData.Progress + 1
 	log.Info("Play next episode",
 		"title", m.getSelectedAnime().Title.Preferred(m.config.UI.TitleLanguage),
@@ -142,7 +142,7 @@ func (m *AnimeListModel) handlePlayEpisode() (tea.Model, tea.Cmd) {
 }
 
 // handleChooseEpisode initiates the episode selection flow
-func (m *AnimeListModel) handleChooseEpisode() (tea.Model, tea.Cmd) {
+func (m *AnimeListModel) handleChooseEpisode() (Model, tea.Cmd) {
 	log.Info("Choose episode to play",
 		"title", m.getSelectedAnime().Title.Preferred(m.config.UI.TitleLanguage),
 		"id", m.getSelectedAnime().ID)

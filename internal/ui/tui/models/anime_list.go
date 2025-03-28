@@ -77,6 +77,10 @@ func NewAnimeListModel(cfg *config.Config, animeService *service.AnimeService) *
 	}
 }
 
+func (m *AnimeListModel) ViewType() View {
+	return ViewAnimeList
+}
+
 // Resize updates the model with new dimensions
 func (m *AnimeListModel) Resize(width, height int) {
 	m.width = width

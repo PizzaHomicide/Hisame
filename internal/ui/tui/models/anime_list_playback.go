@@ -15,7 +15,7 @@ import (
 )
 
 // handlePlaybackMessages handles all playback-related messages
-func (m *AnimeListModel) handlePlaybackMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *AnimeListModel) handlePlaybackMessages(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case PlaybackMsg:
 		switch msg.Type {

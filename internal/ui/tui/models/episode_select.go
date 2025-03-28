@@ -40,6 +40,10 @@ func NewEpisodeSelectModel() *EpisodeSelectModel {
 	}
 }
 
+func (m *EpisodeSelectModel) ViewType() View {
+	return ViewEpisodeSelect
+}
+
 // SetEpisodes sets the episodes to display
 func (m *EpisodeSelectModel) SetEpisodes(episodes []player.AllAnimeEpisodeInfo, animeTitle string) {
 	m.episodes = episodes
@@ -73,7 +77,7 @@ func (m *EpisodeSelectModel) Init() tea.Cmd {
 }
 
 // Update updates the model based on messages
-func (m *EpisodeSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *EpisodeSelectModel) Update(msg tea.Msg) (Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {

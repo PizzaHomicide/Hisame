@@ -2,6 +2,7 @@ package models
 
 import (
 	"github.com/PizzaHomicide/hisame/internal/ui/tui/styles"
+	tea "github.com/charmbracelet/bubbletea"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -10,11 +11,20 @@ import (
 // HelpModel represents a help "modal" that replaces the current view
 type HelpModel struct {
 	width, height int
+	context       View
 }
 
 // NewHelpModel creates a new help model
 func NewHelpModel() *HelpModel {
 	return &HelpModel{}
+}
+
+func (m *HelpModel) ViewType() View {
+	return ViewHelp
+}
+
+func (m *HelpModel) SetContext(context View) {
+	m.context = context
 }
 
 // Resize updates the dimensions of the help model
@@ -24,9 +34,9 @@ func (m *HelpModel) Resize(width, height int) {
 }
 
 // View returns the help content for the specified context
-func (m *HelpModel) View(contextView View) string {
+func (m *HelpModel) View() string {
 	// Get context-specific help content
-	title, content := m.getHelpContent(contextView)
+	title, content := m.getHelpContent(m.context)
 
 	// Create header using your predefined style
 	header := styles.Header(m.width, title)
@@ -150,4 +160,13 @@ func formatHelpContent(content string) string {
 	}
 
 	return strings.Join(styledLines, "\n")
+}
+
+func (m *HelpModel) Update(msg tea.Msg) (Model, tea.Cmd) {
+	// Currently doesn't handle anything
+	return m, nil
+}
+
+func (m *HelpModel) Init() tea.Cmd {
+	return nil
 }

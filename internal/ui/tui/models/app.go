@@ -11,11 +11,28 @@ import (
 	"os"
 )
 
+// Model is the interface that all our models should implement
+type Model interface {
+	// Init initializes the model and returns any initial command
+	Init() tea.Cmd
+
+	// Update handles messages and returns the updated model and any command
+	Update(msg tea.Msg) (Model, tea.Cmd)
+
+	// View renders the model to a string
+	View() string
+
+	// Resize updates a models width & height
+	Resize(width, height int)
+
+	// ViewType returns the type of the view
+	ViewType() View
+}
+
 // AppModel is the main application model that coordinates all child models.  It is the high level wrapper.
 type AppModel struct {
 	config        *config.Config
-	activeView    View  // Track the current active 'main view'
-	activeModal   Modal // Track the current active 'modal overlay' if any
+	modelStack    []Model // UI model stack.  The top model is rendered and handles non-global/orchestration messages
 	width, height int
 
 	// Models used for various views
@@ -30,11 +47,19 @@ type AppModel struct {
 
 // NewAppModel creates a new instance of the main application model
 func NewAppModel(cfg *config.Config) AppModel {
-	var initialView View
-	var animeService *service.AnimeService
+	// Create models
+	authModel := NewAuthModel()
+	helpModel := NewHelpModel()
+	episodeSelectModel := NewEpisodeSelectModel()
 
+	// Initial model stack - will be populated with the appropriate starting model
+	var modelStack []Model
+	var animeService *service.AnimeService
+	var animeListModel *AnimeListModel
+
+	// Check for existing token and set up initial model appropriately
 	if cfg.Auth.Token != "" {
-		log.Info("Token found in config file.  Testing it to see if still valid")
+		log.Info("Token found in config file. Testing it to see if still valid")
 		client, err := anilist.NewClient(cfg.Auth.Token)
 		if err != nil {
 			// Check if it's a network error
@@ -55,36 +80,91 @@ func NewAppModel(cfg *config.Config) AppModel {
 			} else {
 				// It's an invalid token error
 				log.Warn("Invalid token in config. Reauthentication required", "error", err)
-				initialView = ViewAuth
+				modelStack = []Model{authModel}
 			}
 		} else {
 			// Client initialized correctly, so we can bypass auth
 			animeRepo := anilist.NewAnimeRepository(client)
 			animeService = service.NewAnimeService(animeRepo)
-			initialView = ViewAnimeList
+			animeListModel = NewAnimeListModel(cfg, animeService)
+			modelStack = []Model{animeListModel}
 		}
 	} else {
-		initialView = ViewAuth
+		modelStack = []Model{authModel}
 	}
-	return AppModel{
+
+	// If animeListModel wasn't initialized but we need a reference, create an empty one
+	if animeListModel == nil {
+		animeListModel = NewAnimeListModel(cfg, nil)
+	}
+
+	// Create app model
+	app := AppModel{
 		config:             cfg,
-		activeView:         initialView,
-		activeModal:        ModalNone,
-		authModel:          NewAuthModel(),
-		animeListModel:     NewAnimeListModel(cfg, animeService),
-		helpModel:          NewHelpModel(),
-		episodeSelectModel: NewEpisodeSelectModel(),
+		modelStack:         modelStack,
+		authModel:          authModel,
+		animeListModel:     animeListModel,
+		helpModel:          helpModel,
+		episodeSelectModel: episodeSelectModel,
 		animeService:       animeService,
 	}
+
+	return app
+}
+
+// CurrentModel returns the current active model (top of the stack)
+func (m AppModel) CurrentModel() Model {
+	if len(m.modelStack) == 0 {
+		log.Error("Model stack is empty, this should never happen")
+		return nil
+	}
+	return m.modelStack[len(m.modelStack)-1]
+}
+
+// PushModel adds a model to the top of the stack and ensures it's properly sized
+func (m *AppModel) PushModel(model Model) {
+	model.Resize(m.width, m.height)
+	// Add to the stack
+	m.modelStack = append(m.modelStack, model)
+	log.Debug("Pushed model onto stack", "model_type", fmt.Sprintf("%T", model), "stack_size", len(m.modelStack))
+}
+
+// PopModel removes the top model from the stack
+func (m *AppModel) PopModel() {
+	if len(m.modelStack) <= 1 {
+		log.Warn("Attempted to pop the last model from the stack, ignoring")
+		return
+	}
+
+	m.modelStack = m.modelStack[:len(m.modelStack)-1]
+	log.Debug("Popped model from stack", "new_top", fmt.Sprintf("%T", m.CurrentModel()), "stack_size", len(m.modelStack))
+}
+
+// SetStack completely replaces the model stack
+func (m *AppModel) SetStack(models []Model) {
+	if len(models) == 0 {
+		log.Error("Attempted to set empty model stack, ignoring")
+		return
+	}
+
+	m.modelStack = models
+
+	// Resize all models in the new stack
+	for _, model := range m.modelStack {
+		if resizable, ok := model.(interface{ Resize(width, height int) }); ok {
+			resizable.Resize(m.width, m.height)
+		}
+	}
+
+	log.Debug("Set new model stack", "top_model", fmt.Sprintf("%T", m.CurrentModel()), "stack_size", len(m.modelStack))
 }
 
 func (m AppModel) Init() tea.Cmd {
-	log.Info("Initialising Hisame TUI")
+	log.Info("Initializing Hisame TUI")
 
-	// If starting application on anime list view, load the anime now
-	if m.activeView == ViewAnimeList {
-		log.Debug("Existing auth detected.  Loading anime list immediately")
-		return m.animeListModel.Init()
+	// Initialize the current model
+	if currentModel := m.CurrentModel(); currentModel != nil {
+		return currentModel.Init()
 	}
 
 	return nil
@@ -108,140 +188,147 @@ func (m AppModel) logMsg(msg tea.Msg) {
 	log.Trace("Received message in AppModel.Update",
 		"type", msgType,
 		"value", msgValue,
-		"active_modal", m.activeModal,
-		"active_view", m.activeView)
+		"current_model", m.CurrentModel())
 }
 
 func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.logMsg(msg)
-	// Handle common message types first
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		return m.handleKeyMsg(msg)
-	case tea.WindowSizeMsg:
-		return m.handleWindowSizeMsg(msg)
+	// Handle window size changes globally
+	if windowMsg, ok := msg.(tea.WindowSizeMsg); ok {
+		m.width = windowMsg.Width
+		m.height = windowMsg.Height
+
+		// Resize all models in the stack
+		for _, model := range m.modelStack {
+			model.Resize(m.width, m.height)
+		}
+
+		// No need to propagate this message further
+		return m, nil
 	}
 
-	// Handle orchestration messages (those that affect multiple components)
-	if updatedModel, cmd := m.handleOrchestrationMsg(msg); (updatedModel != AppModel{}) {
-		return updatedModel, cmd
-	}
+	// Handle global key shortcuts first
+	if keyMsg, ok := msg.(tea.KeyMsg); ok {
+		switch keyMsg.String() {
+		case "ctrl+c":
+			log.Info("Quit command received. Shutting down...")
+			return m, tea.Quit
 
-	// Any other types of messages should be propagated
-	// Prioritize modal handling
-	if m.activeModal != ModalNone {
-		return m.handleModalMsg(msg)
-	}
+		case "ctrl+h":
+			// Toggle help screen
+			if _, ok := m.CurrentModel().(*HelpModel); ok {
+				// Help is already active, pop it
+				m.PopModel()
+			} else {
+				// Get context from current model
+				context := ViewAnimeList // Default fallback
+				if currentModel := m.CurrentModel(); currentModel != nil {
+					context = currentModel.ViewType()
+				}
 
-	// Handle view-specific messages
-	return m.handleViewMsg(msg)
-}
-
-func (m AppModel) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	log.Trace("Handling key message", "key", msg.String())
-	// Global key shortcuts that apply everywhere
-	switch msg.String() {
-	case "ctrl+c":
-		log.Info("Quit command received. Shutting down...")
-		return m, tea.Quit
-	case "ctrl+l":
-		return m.handleLogout()
-	case "ctrl+h":
-		return m.toggleHelpModal()
-	case "esc":
-		if m.activeModal != ModalNone {
-			m.activeModal = ModalNone
+				// Set context and push help model
+				m.helpModel.SetContext(context)
+				m.PushModel(m.helpModel)
+			}
 			return m, nil
+
+		case "ctrl+l":
+			// Logout
+			return m, m.handleLogout()
+
+		case "esc":
+			// If we have more than one model in the stack, pop the top one
+			if len(m.modelStack) > 1 {
+				m.PopModel()
+				return m, nil
+			}
 		}
 	}
 
-	// Any non-global key messages should be delegated to the active view
-	// IPrioritise
-	if m.activeModal != ModalNone {
-		log.Trace("Delegating key press to modal", "key", msg.String())
-		return m.handleModalMsg(msg)
+	// Handle orchestration messages
+	cmd := m.handleOrchestrationMsg(msg)
+	if cmd != nil {
+		return m, cmd
 	}
 
-	// Delegate to the active view
-	log.Trace("Delegating key press to view", "key", msg.String())
-	return m.handleViewMsg(msg)
-}
-
-func (m AppModel) handleModalMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch m.activeModal {
-	case ModalEpisodeSelect:
-		return m.updateEpisodeSelectModal(msg)
-	case ModalHelp:
-		// If needed, handle Help modal messages
+	// Update the current model
+	currentModel := m.CurrentModel()
+	if currentModel == nil {
+		log.Error("No current model to update")
 		return m, nil
 	}
-	return m, nil
-}
 
-func (m AppModel) handleViewMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch m.activeView {
-	case ViewAuth:
-		return m.updateAuthView(msg)
-	case ViewAnimeList:
-		return m.updateAnimeListView(msg)
+	updatedModel, cmd := currentModel.Update(msg)
+
+	// Replace the current model with the updated one
+	if updatedModel != nil {
+		m.modelStack[len(m.modelStack)-1] = updatedModel
 	}
-	return m, nil
+
+	return m, cmd
 }
 
-func (m AppModel) handleOrchestrationMsg(msg tea.Msg) (AppModel, tea.Cmd) {
+// handleOrchestrationMsg handles messages that require coordination between models
+func (m *AppModel) handleOrchestrationMsg(msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
+	case AuthMsg:
+		if msg.Success {
+			return m.handleSuccessfulAuth(msg.Token)
+		} else {
+			log.Error("Authentication failed", "error", msg.Error)
+			// Reset auth model in case it's in a bad state
+			m.authModel = NewAuthModel()
+			m.SetStack([]Model{m.authModel})
+			return tea.Quit
+		}
+
 	case EpisodeMsg:
-		// Handle only episode messages that require orchestration
 		switch msg.Type {
 		case EpisodeEventLoaded:
 			if len(msg.Episodes) == 0 {
 				log.Warn("No episodes found for anime", "title", msg.Title)
+				// Turn off loading in anime list model
 				m.animeListModel.DisableLoading()
-				return m, nil
+				return nil
 			}
 
 			log.Info("Episodes loaded", "count", len(msg.Episodes), "title", msg.Title)
 			m.episodeSelectModel.SetEpisodes(msg.Episodes, msg.Title)
-			m.activeModal = ModalEpisodeSelect
-			log.Debug(string("Current active modal: " + m.activeModal))
+			m.PushModel(m.episodeSelectModel)
 			m.animeListModel.DisableLoading()
-			return m, nil
+			return nil
+
 		case EpisodeEventSelected:
 			if msg.Episode != nil {
-				log.Info("Episode selected from modal",
+				log.Info("Episode selected from episode select model",
 					"overall_epNum", msg.Episode.OverallEpisodeNumber,
 					"allanime_epNum", msg.Episode.AllAnimeEpisodeNumber,
-					"allanime_id", msg.Episode.AllAnimeID,
 					"title", msg.Episode.Title)
 
-				// Close the modal first
-				m.activeModal = ModalNone
+				// Pop episode select model
+				m.PopModel()
 
-				// Start loading the sources by delegating to the anime list model
-				animeListModel, cmd := m.animeListModel.Update(msg)
-				m.animeListModel = animeListModel.(*AnimeListModel)
-
-				return m, cmd
+				// Delegate to anime list model to handle starting playback
+				_, cmd := m.animeListModel.Update(msg)
+				return cmd
 			}
-			return m, nil
 		}
 
 	case PlaybackMsg:
-		// Handle only playback messages that require orchestration
+		// Some playback messages affect the model stack
 		switch msg.Type {
 		case PlaybackEventStarted, PlaybackEventEnded, PlaybackEventError:
-			// Close any active modal
-			m.activeModal = ModalNone
+			// Make sure any loading indicators are disabled in the anime list
 			m.animeListModel.DisableLoading()
-			return m, nil
+			return nil
 		}
 	}
 
-	// No orchestration was handled - return a zero value to indicate that
-	return AppModel{}, nil
+	return nil
 }
 
-func (m AppModel) handleLogout() (tea.Model, tea.Cmd) {
+// handleLogout handles the logout action
+func (m *AppModel) handleLogout() tea.Cmd {
 	log.Info("Logging out. Cleaning up token from config file...")
 	m.config.Auth.Token = ""
 	err := config.UpdateConfig(func(conf *config.Config) {
@@ -250,54 +337,16 @@ func (m AppModel) handleLogout() (tea.Model, tea.Cmd) {
 	if err != nil {
 		log.Warn("Error cleaning up token from config file. May need to manually edit config to remove the token", "error", err)
 	}
-	// Throw back to login screen
-	m.authModel.Reset()
-	m.activeView = ViewAuth
-	return m, nil
+
+	// Reset auth model and make it the only model in stack
+	m.authModel = NewAuthModel()
+	m.SetStack([]Model{m.authModel})
+
+	return nil
 }
 
-func (m AppModel) toggleHelpModal() (tea.Model, tea.Cmd) {
-	log.Debug("Help requested", "active_view", m.activeView)
-	if m.activeModal != ModalNone {
-		m.activeModal = ModalNone
-	} else {
-		m.activeModal = ModalHelp
-	}
-	return m, nil
-}
-
-func (m AppModel) handleAuthMsg(msg AuthMsg) (tea.Model, tea.Cmd) {
-	if msg.Success {
-		// Handle successful auth
-		return m.handleSuccessfulAuth(msg.Token)
-	} else {
-		// Handle auth failure
-		log.Error("Authentication failed", "error", msg.Error)
-		m.authModel.Reset()
-		return m, tea.Quit
-	}
-}
-
-// handleWindowSizeMsg updates all models with the new window dimensions
-func (m AppModel) handleWindowSizeMsg(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
-	log.Debug("Window size changed", "old_width", m.width, "new_width", msg.Width,
-		"old_height", m.height, "new_height", msg.Height)
-
-	// Update the app model's dimensions
-	m.width = msg.Width
-	m.height = msg.Height
-
-	// Propagate new window size to all views so they can render correctly
-	m.authModel.Resize(msg.Width, msg.Height)
-	m.helpModel.Resize(msg.Width, msg.Height)
-	m.animeListModel.Resize(msg.Width, msg.Height)
-	m.episodeSelectModel.Resize(msg.Width, msg.Height)
-
-	return m, nil
-}
-
-// handleSuccessfulAuth processes a successful authentication
-func (m AppModel) handleSuccessfulAuth(token string) (tea.Model, tea.Cmd) {
+// handleSuccessfulAuth handles a successful authentication
+func (m *AppModel) handleSuccessfulAuth(token string) tea.Cmd {
 	log.Info("Authentication successful")
 
 	// Save the token to the config
@@ -309,108 +358,31 @@ func (m AppModel) handleSuccessfulAuth(token string) (tea.Model, tea.Cmd) {
 		log.Warn("Error saving auth token to config. Will need to reauthenticate when Hisame opens next", "error", err)
 	}
 
-	// Reset the auth model for future use
-	m.authModel.Reset()
-
 	// Initialize AniList client and services
 	client, err := anilist.NewClient(token)
 	if err != nil {
 		log.Error("Failed to create AniList client after authentication", "error", err)
-		return m, tea.Quit
+		return tea.Quit
 	}
 
 	// Set up the anime service and models
 	animeRepo := anilist.NewAnimeRepository(client)
 	m.animeService = service.NewAnimeService(animeRepo)
 	m.animeListModel = NewAnimeListModel(m.config, m.animeService)
-	m.animeListModel.Resize(m.width, m.height)
 
-	// Change the active view
-	m.activeView = ViewAnimeList
+	// Replace the entire stack with just the anime list model
+	m.SetStack([]Model{m.animeListModel})
 
-	// Initialize the anime list view
-	return m, m.animeListModel.Init()
+	// Initialize the anime list model
+	return m.animeListModel.Init()
 }
 
 func (m AppModel) View() string {
-	// If there is an active modal it takes precedence
-	switch m.activeModal {
-	case ModalHelp:
-		return m.helpModel.View(m.activeView)
-	case ModalEpisodeSelect:
-		return m.episodeSelectModel.View()
+	// Render the current model
+	current := m.CurrentModel()
+	if current == nil {
+		return "Error: No active model to display\nThis should not happen.  Please exit Hisame with ctrl+c"
 	}
 
-	// Else display the actual view
-	switch m.activeView {
-	case ViewAuth:
-		return m.authModel.View()
-	case ViewAnimeList:
-		return m.animeListModel.View()
-	default:
-		log.Warn("Unknown view", "view", m.activeView)
-		return "Unknown view\nPress ctrl+c to quit."
-	}
-}
-
-// updateAuthView delegates message processing to
-func (m AppModel) updateAuthView(msg tea.Msg) (tea.Model, tea.Cmd) {
-	// Any messages that require orchestration/view changing specific to the auth view
-	switch msg := msg.(type) {
-	case AuthMsg:
-		if msg.Success {
-			log.Info("Authentication successful")
-			m.config.Auth.Token = msg.Token
-			err := config.UpdateConfig(func(conf *config.Config) {
-				conf.Auth.Token = msg.Token
-			})
-			if err != nil {
-				log.Warn("Error saving auth token to config. Will need to reauthenticate when Hisame opens next", "error", err)
-			}
-			m.authModel.Reset()
-
-			// Initialize AniList client and services
-			client, err := anilist.NewClient(msg.Token)
-			if err != nil {
-				log.Error("Failed to create AniList client after authentication", "error", err)
-				return m, tea.Quit
-			}
-
-			animeRepo := anilist.NewAnimeRepository(client)
-			m.animeService = service.NewAnimeService(animeRepo)
-			m.animeListModel = NewAnimeListModel(m.config, m.animeService)
-			m.animeListModel.Resize(m.width, m.height)
-			m.activeView = ViewAnimeList
-
-			return m, m.animeListModel.Init()
-		} else {
-			log.Error("Authentication failed", "error", msg.Error)
-			m.authModel.Reset()
-			// TODO: Add better error handling when auth fails
-			return m, tea.Quit
-		}
-	}
-
-	// Delegate other messages to the model
-	authModel, cmd := m.authModel.Update(msg)
-	m.authModel = authModel.(*AuthModel)
-
-	return m, cmd
-}
-
-// updateAnimeListView delegates message processing to the anime list model
-func (m AppModel) updateAnimeListView(msg tea.Msg) (tea.Model, tea.Cmd) {
-	// Delegate to the animeListModel
-	animeListModel, cmd := m.animeListModel.Update(msg)
-	m.animeListModel = animeListModel.(*AnimeListModel)
-
-	return m, cmd
-}
-
-func (m AppModel) updateEpisodeSelectModal(msg tea.Msg) (tea.Model, tea.Cmd) {
-	// Delegate to the episode select model
-	model, cmd := m.episodeSelectModel.Update(msg)
-	m.episodeSelectModel = model.(*EpisodeSelectModel)
-
-	return m, cmd
+	return current.View()
 }

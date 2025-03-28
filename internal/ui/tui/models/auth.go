@@ -34,11 +34,15 @@ func NewAuthModel() *AuthModel {
 	}
 }
 
+func (m *AuthModel) ViewType() View {
+	return ViewAuth
+}
+
 func (m *AuthModel) Init() tea.Cmd {
 	return nil
 }
 
-func (m *AuthModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *AuthModel) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
