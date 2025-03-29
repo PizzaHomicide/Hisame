@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"github.com/PizzaHomicide/hisame/internal/config"
 	"github.com/PizzaHomicide/hisame/internal/domain"
-	"github.com/PizzaHomicide/hisame/internal/log"
 	"github.com/PizzaHomicide/hisame/internal/player"
 	"github.com/PizzaHomicide/hisame/internal/service"
 	"github.com/PizzaHomicide/hisame/internal/ui/tui/styles"
@@ -65,8 +64,7 @@ func NewAnimeListModel(cfg *config.Config, animeService *service.AnimeService) *
 		config:        cfg,
 		animeService:  animeService,
 		playerService: player.NewPlayerService(cfg),
-		loading:       true,
-		loadingMsg:    "Loading anime list...",
+		loading:       false,
 		spinner:       s,
 		filters:       defaultFilters,
 		cursor:        0,
@@ -89,31 +87,47 @@ func (m *AnimeListModel) Resize(width, height int) {
 
 // Init initializes the model
 func (m *AnimeListModel) Init() tea.Cmd {
-	return tea.Batch(
-		m.spinner.Tick,
-		loadAnimeList(m.animeService),
-	)
+	return func() tea.Msg {
+		return LoadingMsg{
+			Type:        LoadingStart,
+			Message:     "Loading anime list...",
+			Title:       "Starting Hisame",
+			ContextInfo: "Fetching your anime data from AniList",
+			Operation:   m.fetchAnimeListCmd(),
+		}
+	}
 }
 
-// loadAnimeList loads the anime list from the service
-func loadAnimeList(animeService *service.AnimeService) tea.Cmd {
+// The fetchAnimeListCmd creates a command to run in the background
+func (m *AnimeListModel) fetchAnimeListCmd() tea.Cmd {
 	return func() tea.Msg {
+		// Fetch data from service
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
-		if err := animeService.LoadAnimeList(ctx); err != nil {
-			log.Error("Failed to load anime list", "error", err)
-			return AnimeListMsg{
+		if err := m.animeService.LoadAnimeList(ctx); err != nil {
+			return AnimeListLoadResultMsg{
 				Success: false,
 				Error:   err,
 			}
 		}
 
-		log.Info("Anime list loaded successfully. Sending AnimeListLoadedMsg")
-		return AnimeListMsg{
-			Success: true,
+		return AnimeListLoadResultMsg{
+			Success:   true,
+			AnimeList: m.animeService.GetAnimeList(),
 		}
 	}
+}
+
+func (m *AnimeListModel) HandleAnimeListLoaded(animeList []*domain.Anime) (Model, tea.Cmd) {
+	m.allAnime = animeList
+	m.applyFilters()
+	return m, nil
+}
+
+func (m *AnimeListModel) HandleAnimeListError(err error) (Model, tea.Cmd) {
+	// TODO:  UX for error here?
+	return m, nil
 }
 
 // View renders the anime list model

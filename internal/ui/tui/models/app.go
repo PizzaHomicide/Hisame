@@ -9,7 +9,6 @@ import (
 	"github.com/PizzaHomicide/hisame/internal/service"
 	tea "github.com/charmbracelet/bubbletea"
 	"os"
-	"time"
 )
 
 // Model is the interface that all our models should implement
@@ -127,7 +126,7 @@ func (m *AppModel) PushModel(model Model) {
 	model.Resize(m.width, m.height)
 	// Add to the stack
 	m.modelStack = append(m.modelStack, model)
-	log.Debug("Pushed model onto stack", "model_type", fmt.Sprintf("%T", model), "stack_size", len(m.modelStack))
+	log.Debug("Pushed model onto stack", "model_type", model.ViewType(), "stack_size", len(m.modelStack))
 }
 
 // PopModel removes the top model from the stack
@@ -237,27 +236,6 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Logout
 			return m, m.handleLogout()
 
-		// TODO: Remove this csae.  Only exists to test new loading model behaviour.
-		case "ctrl+u":
-			return m, func() tea.Msg {
-				// Create a test operation that will finish after a delay
-				testOperation := func() tea.Msg {
-					// Simulate some work with a 3-second delay
-					time.Sleep(3 * time.Second)
-					return LoadingMsg{
-						Type: LoadingStop,
-					}
-				}
-
-				return LoadingMsg{
-					Type:        LoadingStart,
-					Title:       "Test Loading",
-					Message:     "Processing your request...",
-					ContextInfo: "This is a test of the loading model.",
-					ActionText:  "Press ESC to dismiss or wait 3 seconds",
-					Operation:   testOperation,
-				}
-			}
 		case "esc":
 			// If we have more than one model in the stack, pop the top one
 			if len(m.modelStack) > 1 {
@@ -345,6 +323,22 @@ func (m *AppModel) handleOrchestrationMsg(msg tea.Msg) tea.Cmd {
 			return nil
 		}
 
+	case AnimeListLoadResultMsg:
+		if currentModel, ok := m.CurrentModel().(*LoadingModel); ok {
+			log.Debug("Stopping loading for anime list refresh",
+				"elapsed", currentModel.GetElapsedTime())
+			m.PopModel()
+		}
+
+		// Then forward the result to the AnimeListModel
+		if msg.Success {
+			_, cmd := m.animeListModel.HandleAnimeListLoaded(msg.AnimeList)
+			return cmd
+		} else {
+			_, cmd := m.animeListModel.HandleAnimeListError(msg.Error)
+			return cmd
+		}
+
 	case LoadingMsg:
 		switch msg.Type {
 		case LoadingStart:
@@ -376,20 +370,23 @@ func (m *AppModel) handleOrchestrationMsg(msg tea.Msg) tea.Cmd {
 			return loadingModel.Init()
 
 		case LoadingStop:
-			// Check if the top model is a loading model
-			if currentModel, ok := m.CurrentModel().(*LoadingModel); ok {
-				log.Debug("Stopping loading state",
-					"message", currentModel.message,
-					"elapsed", currentModel.GetElapsedTime())
-				m.PopModel()
-			} else {
-				log.Warn("Received LoadingStop but current model is not a LoadingModel")
-			}
+			m.popLoadingModel()
 			return nil
 		}
 	}
 
 	return nil
+}
+
+func (m *AppModel) popLoadingModel() {
+	if currentModel, ok := m.CurrentModel().(*LoadingModel); ok {
+		log.Debug("Stopping loading state",
+			"message", currentModel.message,
+			"elapsed", currentModel.GetElapsedTime())
+		m.PopModel()
+	} else {
+		log.Warn("Received LoadingStop but current model is not a LoadingModel")
+	}
 }
 
 // handleLogout handles the logout action

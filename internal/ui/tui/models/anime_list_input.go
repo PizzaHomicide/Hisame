@@ -108,13 +108,13 @@ func (m *AnimeListModel) handleKeyPress(msg tea.KeyMsg) (Model, tea.Cmd) {
 		return m.handleChooseEpisode()
 	case "r":
 		// Refresh anime list
-		m.loading = true
-		m.loadingMsg = "Loading anime list..."
-		m.loadError = nil
-		return m, tea.Batch(
-			m.spinner.Tick,
-			loadAnimeList(m.animeService),
-		)
+		return m, func() tea.Msg {
+			return LoadingMsg{
+				Type:      LoadingStart,
+				Message:   "Refreshing anime list...",
+				Operation: m.fetchAnimeListCmd(),
+			}
+		}
 	}
 
 	return m, nil

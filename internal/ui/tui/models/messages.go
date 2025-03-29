@@ -1,6 +1,7 @@
 package models
 
 import (
+	"github.com/PizzaHomicide/hisame/internal/domain"
 	"github.com/PizzaHomicide/hisame/internal/player"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -74,4 +75,10 @@ type LoadingMsg struct {
 	ContextInfo string  // Optional context information
 	ActionText  string  // Optional action text
 	Operation   tea.Cmd // Optional command to run during loading
+}
+
+type AnimeListLoadResultMsg struct {
+	Success   bool
+	AnimeList []*domain.Anime
+	Error     error
 }
