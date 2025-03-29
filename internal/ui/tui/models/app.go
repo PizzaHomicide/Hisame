@@ -9,6 +9,7 @@ import (
 	"github.com/PizzaHomicide/hisame/internal/service"
 	tea "github.com/charmbracelet/bubbletea"
 	"os"
+	"time"
 )
 
 // Model is the interface that all our models should implement
@@ -188,7 +189,7 @@ func (m AppModel) logMsg(msg tea.Msg) {
 	log.Trace("Received message in AppModel.Update",
 		"type", msgType,
 		"value", msgValue,
-		"current_model", m.CurrentModel())
+		"current_model", m.CurrentModel().ViewType())
 }
 
 func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -236,6 +237,27 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Logout
 			return m, m.handleLogout()
 
+		// TODO: Remove this csae.  Only exists to test new loading model behaviour.
+		case "ctrl+u":
+			return m, func() tea.Msg {
+				// Create a test operation that will finish after a delay
+				testOperation := func() tea.Msg {
+					// Simulate some work with a 3-second delay
+					time.Sleep(3 * time.Second)
+					return LoadingMsg{
+						Type: LoadingStop,
+					}
+				}
+
+				return LoadingMsg{
+					Type:        LoadingStart,
+					Title:       "Test Loading",
+					Message:     "Processing your request...",
+					ContextInfo: "This is a test of the loading model.",
+					ActionText:  "Press ESC to dismiss or wait 3 seconds",
+					Operation:   testOperation,
+				}
+			}
 		case "esc":
 			// If we have more than one model in the stack, pop the top one
 			if len(m.modelStack) > 1 {
@@ -320,6 +342,49 @@ func (m *AppModel) handleOrchestrationMsg(msg tea.Msg) tea.Cmd {
 		case PlaybackEventStarted, PlaybackEventEnded, PlaybackEventError:
 			// Make sure any loading indicators are disabled in the anime list
 			m.animeListModel.DisableLoading()
+			return nil
+		}
+
+	case LoadingMsg:
+		switch msg.Type {
+		case LoadingStart:
+			// Create and push a loading model
+			loadingModel := NewLoadingModel(msg.Message)
+
+			// Apply optional configurations if provided
+			if msg.Title != "" {
+				loadingModel = loadingModel.WithTitle(msg.Title)
+			}
+			if msg.ContextInfo != "" {
+				loadingModel = loadingModel.WithContextInfo(msg.ContextInfo)
+			}
+			if msg.ActionText != "" {
+				loadingModel = loadingModel.WithActionText(msg.ActionText)
+			}
+
+			log.Debug("Starting loading state", "message", msg.Message)
+			m.PushModel(loadingModel)
+
+			// If there's an operation to run during loading, execute it
+			if msg.Operation != nil {
+				return tea.Batch(
+					loadingModel.Init(),
+					msg.Operation,
+				)
+			}
+
+			return loadingModel.Init()
+
+		case LoadingStop:
+			// Check if the top model is a loading model
+			if currentModel, ok := m.CurrentModel().(*LoadingModel); ok {
+				log.Debug("Stopping loading state",
+					"message", currentModel.message,
+					"elapsed", currentModel.GetElapsedTime())
+				m.PopModel()
+			} else {
+				log.Warn("Received LoadingStop but current model is not a LoadingModel")
+			}
 			return nil
 		}
 	}

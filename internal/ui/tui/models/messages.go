@@ -1,6 +1,9 @@
 package models
 
-import "github.com/PizzaHomicide/hisame/internal/player"
+import (
+	"github.com/PizzaHomicide/hisame/internal/player"
+	tea "github.com/charmbracelet/bubbletea"
+)
 
 // AuthMsg combines auth success and failure
 type AuthMsg struct {
@@ -53,4 +56,22 @@ type EpisodeMsg struct {
 	Episode  *player.AllAnimeEpisodeInfo
 	Title    string
 	Error    error
+}
+
+// LoadingType represents different loading-related events
+type LoadingType string
+
+const (
+	LoadingStart LoadingType = "start" // Start showing loading
+	LoadingStop  LoadingType = "stop"  // Stop showing loading
+)
+
+// LoadingMsg represents a loading state change message
+type LoadingMsg struct {
+	Type        LoadingType
+	Message     string  // Primary message to show
+	Title       string  // Optional title
+	ContextInfo string  // Optional context information
+	ActionText  string  // Optional action text
+	Operation   tea.Cmd // Optional command to run during loading
 }

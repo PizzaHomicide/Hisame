@@ -9,4 +9,5 @@ const (
 	ViewAnimeList     View = "anime-list"
 	ViewHelp          View = "help"
 	ViewEpisodeSelect View = "episode-select"
+	ViewLoading       View = "loading"
 )
