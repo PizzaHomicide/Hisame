@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"github.com/PizzaHomicide/hisame/internal/domain"
 	"github.com/PizzaHomicide/hisame/internal/log"
+	"sync"
 )
 
 type AnimeService struct {
 	repo domain.AnimeRepository
 	// TODO consider a map for faster access when looking for a specific anime by ID
-	animeList []*domain.Anime // Keeps a local copy of all the anime, only updating it on user request
+	animeList  []*domain.Anime // Keeps a local copy of all the anime, only updating it on user request
+	updateLock sync.Mutex
 }
 
 func NewAnimeService(repo domain.AnimeRepository) *AnimeService {
@@ -60,6 +62,9 @@ func (s *AnimeService) GetAnimeByID(id int) *domain.Anime {
 // IncrementProgress increases the progress for an anime by 1
 // Returns an error if progress is already at or above episode count
 func (s *AnimeService) IncrementProgress(ctx context.Context, animeID int) error {
+	s.updateLock.Lock()
+	defer s.updateLock.Unlock()
+
 	// Find the anime in our cached list
 	anime := s.GetAnimeByID(animeID)
 	if anime == nil {
@@ -120,6 +125,9 @@ func (s *AnimeService) IncrementProgress(ctx context.Context, animeID int) error
 // DecrementProgress decreases the progress for an anime by 1
 // Returns an error if progress is already 0
 func (s *AnimeService) DecrementProgress(ctx context.Context, animeID int) error {
+	s.updateLock.Lock()
+	defer s.updateLock.Unlock()
+
 	// Find the anime in our cached list
 	anime := s.GetAnimeByID(animeID)
 	if anime == nil {
