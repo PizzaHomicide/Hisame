@@ -3,6 +3,7 @@ package models
 import (
 	"github.com/PizzaHomicide/hisame/internal/domain"
 	"github.com/PizzaHomicide/hisame/internal/player"
+	"github.com/PizzaHomicide/hisame/internal/repository/anilist"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -81,4 +82,21 @@ type AnimeListLoadResultMsg struct {
 	Success   bool
 	AnimeList []*domain.Anime
 	Error     error
+}
+
+// TokenValidationMsg represents the result of validating an authentication token
+type TokenValidationMsg struct {
+	Valid     bool            // Whether the token is valid
+	Client    *anilist.Client // The initialized client if token is valid
+	User      *domain.User    // User information if token is valid
+	Error     error           // Error that occurred during validation, if any
+	IsNetwork bool            // Whether the error was a network-related error
+}
+
+// AnimeUpdatedMsg indicates an anime in the list has been updated
+type AnimeUpdatedMsg struct {
+	Success bool
+	AnimeID int
+	Message string
+	Error   error
 }

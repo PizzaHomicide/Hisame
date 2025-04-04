@@ -45,72 +45,96 @@ type AppModel struct {
 	animeService *service.AnimeService
 }
 
-// NewAppModel creates a new instance of the main application model
 func NewAppModel(cfg *config.Config) AppModel {
 	// Create models
 	authModel := NewAuthModel()
 	helpModel := NewHelpModel()
 	episodeSelectModel := NewEpisodeSelectModel()
 
-	// Initial model stack - will be populated with the appropriate starting model
-	var modelStack []Model
-	var animeService *service.AnimeService
-	var animeListModel *AnimeListModel
+	// Create an initial loading model for startup
+	initialLoadingModel := NewLoadingModel("Starting Hisame...").
+		WithTitle("Initialising")
 
-	// Check for existing token and set up initial model appropriately
-	if cfg.Auth.Token != "" {
-		log.Info("Token found in config file. Testing it to see if still valid")
-		client, err := anilist.NewClient(cfg.Auth.Token)
-		if err != nil {
-			// Check if it's a network error
-			var netErr anilist.NetworkError
-			if errors.As(err, &netErr) {
-				// Network error - print message and exit without clearing token
-				errorMsg := fmt.Sprintf("Network error while connecting to AniList: %v\n", netErr.Err)
-				errorMsg += "Please check your internet connection and try again.\n"
+	// Start with just the loading model
+	modelStack := []Model{initialLoadingModel}
 
-				// Log the error
-				log.Error("Network error during startup", "error", netErr.Err)
-
-				// Print to stderr for user to see
-				_, _ = fmt.Fprintln(os.Stderr, errorMsg)
-
-				// Exit with error code
-				os.Exit(1)
-			} else {
-				// It's an invalid token error
-				log.Warn("Invalid token in config. Reauthentication required", "error", err)
-				modelStack = []Model{authModel}
-			}
-		} else {
-			// Client initialized correctly, so we can bypass auth
-			animeRepo := anilist.NewAnimeRepository(client)
-			animeService = service.NewAnimeService(animeRepo)
-			animeListModel = NewAnimeListModel(cfg, animeService)
-			modelStack = []Model{animeListModel}
-		}
-	} else {
-		modelStack = []Model{authModel}
-	}
-
-	// If animeListModel wasn't initialized but we need a reference, create an empty one
-	if animeListModel == nil {
-		animeListModel = NewAnimeListModel(cfg, nil)
-	}
-
-	// Create app model
 	app := AppModel{
 		config:             cfg,
 		modelStack:         modelStack,
 		authModel:          authModel,
-		animeListModel:     animeListModel,
 		helpModel:          helpModel,
 		episodeSelectModel: episodeSelectModel,
-		animeService:       animeService,
 	}
 
 	return app
 }
+
+//// NewAppModel creates a new instance of the main application model
+//func NewAppModel(cfg *config.Config) AppModel {
+//	// Create models
+//	authModel := NewAuthModel()
+//	helpModel := NewHelpModel()
+//	episodeSelectModel := NewEpisodeSelectModel()
+//
+//	// Initial model stack - will be populated with the appropriate starting model
+//	var modelStack []Model
+//	var animeService *service.AnimeService
+//	var animeListModel *AnimeListModel
+//
+//	// Check for existing token and set up initial model appropriately
+//	if cfg.Auth.Token != "" {
+//		log.Info("Token found in config file. Testing it to see if still valid")
+//		client, err := anilist.NewClient(cfg.Auth.Token)
+//		if err != nil {
+//			// Check if it's a network error
+//			var netErr anilist.NetworkError
+//			if errors.As(err, &netErr) {
+//				// Network error - print message and exit without clearing token
+//				errorMsg := fmt.Sprintf("Network error while connecting to AniList: %v\n", netErr.Err)
+//				errorMsg += "Please check your internet connection and try again.\n"
+//
+//				// Log the error
+//				log.Error("Network error during startup", "error", netErr.Err)
+//
+//				// Print to stderr for user to see
+//				_, _ = fmt.Fprintln(os.Stderr, errorMsg)
+//
+//				// Exit with error code
+//				os.Exit(1)
+//			} else {
+//				// It's an invalid token error
+//				log.Warn("Invalid token in config. Reauthentication required", "error", err)
+//				modelStack = []Model{authModel}
+//			}
+//		} else {
+//			// Client initialized correctly, so we can bypass auth
+//			animeRepo := anilist.NewAnimeRepository(client)
+//			animeService = service.NewAnimeService(animeRepo)
+//			animeListModel = NewAnimeListModel(cfg, animeService)
+//			modelStack = []Model{animeListModel}
+//		}
+//	} else {
+//		modelStack = []Model{authModel}
+//	}
+//
+//	// If animeListModel wasn't initialized but we need a reference, create an empty one
+//	if animeListModel == nil {
+//		animeListModel = NewAnimeListModel(cfg, nil)
+//	}
+//
+//	// Create app model
+//	app := AppModel{
+//		config:             cfg,
+//		modelStack:         modelStack,
+//		authModel:          authModel,
+//		animeListModel:     animeListModel,
+//		helpModel:          helpModel,
+//		episodeSelectModel: episodeSelectModel,
+//		animeService:       animeService,
+//	}
+//
+//	return app
+//}
 
 // CurrentModel returns the current active model (top of the stack)
 func (m AppModel) CurrentModel() Model {
@@ -160,14 +184,13 @@ func (m *AppModel) SetStack(models []Model) {
 }
 
 func (m AppModel) Init() tea.Cmd {
-	log.Info("Initializing Hisame TUI")
+	log.Info("Initialising Hisame TUI")
 
-	// Initialize the current model
-	if currentModel := m.CurrentModel(); currentModel != nil {
-		return currentModel.Init()
-	}
-
-	return nil
+	// Start the loading spinner and begin token validation
+	return tea.Batch(
+		m.CurrentModel().Init(), // Initialize the loading model
+		m.validateTokenCmd(),    // Start token validation process
+	)
 }
 
 func (m AppModel) logMsg(msg tea.Msg) {
@@ -271,6 +294,59 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // handleOrchestrationMsg handles messages that require coordination between models
 func (m *AppModel) handleOrchestrationMsg(msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
+	case TokenValidationMsg:
+		// Pop the loading model
+		if len(m.modelStack) > 0 {
+			m.PopModel()
+		}
+
+		if !msg.Valid {
+			if msg.IsNetwork {
+				// Network error - show error and exit
+				return func() tea.Msg {
+					fmt.Fprintf(os.Stderr, "Network error: %v\nPlease check your connection and try again.\n", msg.Error)
+					return tea.Quit()
+				}
+			}
+
+			// Invalid token - clear it and go to auth screen
+			if msg.Error != nil {
+				log.Warn("Invalid token in config. Clearing token.", "error", msg.Error)
+				m.config.Auth.Token = ""
+				err := config.UpdateConfig(func(conf *config.Config) {
+					conf.Auth.Token = ""
+				})
+				if err != nil {
+					log.Warn("Failed to clear invalid token from config", "error", err)
+				}
+			}
+
+			// Go to auth screen
+			m.PushModel(m.authModel)
+			return m.authModel.Init()
+		}
+
+		// Valid token - set up services and go to anime list
+		animeRepo := anilist.NewAnimeRepository(msg.Client)
+		animeService := service.NewAnimeService(animeRepo)
+		animeListModel := NewAnimeListModel(m.config, animeService)
+
+		// Save references
+		m.animeService = animeService
+		m.animeListModel = animeListModel
+
+		// Push anime list model
+		m.PushModel(animeListModel)
+
+		// Now start loading the anime list data
+		return func() tea.Msg {
+			return LoadingMsg{
+				Type:      LoadingStart,
+				Message:   "Loading your anime list...",
+				Title:     "Fetching Data",
+				Operation: animeListModel.fetchAnimeListCmd(),
+			}
+		}
 	case AuthMsg:
 		if msg.Success {
 			return m.handleSuccessfulAuth(msg.Token)
@@ -447,4 +523,42 @@ func (m AppModel) View() string {
 	}
 
 	return current.View()
+}
+
+func (m AppModel) validateTokenCmd() tea.Cmd {
+	return func() tea.Msg {
+		token := m.config.Auth.Token
+
+		if token == "" {
+			// No token, go straight to auth screen
+			return TokenValidationMsg{
+				Valid: false,
+			}
+		}
+
+		// Validate token by making API call
+		client, err := anilist.NewClient(token)
+		if err != nil {
+			// Handle various error types as before
+			var netErr anilist.NetworkError
+			if errors.As(err, &netErr) {
+				return TokenValidationMsg{
+					Valid:     false,
+					Error:     err,
+					IsNetwork: true,
+				}
+			}
+
+			return TokenValidationMsg{
+				Valid: false,
+				Error: err,
+			}
+		}
+
+		// Token is valid
+		return TokenValidationMsg{
+			Valid:  true,
+			Client: client,
+		}
+	}
 }

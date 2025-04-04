@@ -6,8 +6,10 @@ package models
 // and initiating playback actions based on user commands.
 
 import (
+	"context"
 	"fmt"
 	"github.com/charmbracelet/bubbles/spinner"
+	"time"
 
 	"github.com/PizzaHomicide/hisame/internal/log"
 	tea "github.com/charmbracelet/bubbletea"
@@ -65,6 +67,20 @@ func (m *AnimeListModel) Update(msg tea.Msg) (Model, tea.Cmd) {
 			m.loading = false
 			m.loadError = msg.Error
 		}
+
+	case AnimeUpdatedMsg:
+		if msg.Success {
+			log.Info("Anime updated successfully",
+				"animeID", msg.AnimeID,
+				"message", msg.Message)
+			// Refresh the UI to show updated data
+			m.applyFilters()
+		} else {
+			log.Error("Anime update failed",
+				"animeID", msg.AnimeID,
+				"error", msg.Error)
+		}
+		return m, nil
 	}
 
 	// Handle other message types in the playback file
@@ -115,9 +131,87 @@ func (m *AnimeListModel) handleKeyPress(msg tea.KeyMsg) (Model, tea.Cmd) {
 				Operation: m.fetchAnimeListCmd(),
 			}
 		}
+	case "+":
+		return m.handleIncrementProgress()
+	case "-":
+		return m.handleDecrementProgress()
 	}
 
 	return m, nil
+}
+
+// handleIncrementProgress handles incrementing the progress of the selected anime
+func (m *AnimeListModel) handleIncrementProgress() (Model, tea.Cmd) {
+	anime := m.getSelectedAnime()
+	if anime == nil {
+		return m, nil
+	}
+
+	return m, func() tea.Msg {
+		log.Info("Incrementing progress",
+			"title", anime.Title.Preferred(m.config.UI.TitleLanguage),
+			"id", anime.ID,
+			"current_progress", anime.UserData.Progress)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		err := m.animeService.IncrementProgress(ctx, anime.ID)
+		if err != nil {
+			log.Error("Failed to increment progress", "error", err)
+			return AnimeUpdatedMsg{
+				Success: false,
+				AnimeID: anime.ID,
+				Error:   err,
+			}
+		}
+
+		return AnimeUpdatedMsg{
+			Success: true,
+			AnimeID: anime.ID,
+			Message: fmt.Sprintf("Updated progress for %s to %d/%d",
+				anime.Title.Preferred(m.config.UI.TitleLanguage),
+				anime.UserData.Progress,
+				anime.Episodes),
+		}
+	}
+}
+
+// handleDecrementProgress handles decrementing the progress of the selected anime
+func (m *AnimeListModel) handleDecrementProgress() (Model, tea.Cmd) {
+	anime := m.getSelectedAnime()
+	if anime == nil {
+		return m, nil
+	}
+
+	return m, func() tea.Msg {
+		log.Info("Decrementing progress",
+			"title", anime.Title.Preferred(m.config.UI.TitleLanguage),
+			"id", anime.ID,
+			"current_progress", anime.UserData.Progress)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		err := m.animeService.DecrementProgress(ctx, anime.ID)
+		if err != nil {
+			log.Error("Failed to decrement progress", "error", err)
+			return AnimeUpdatedMsg{
+				Success: false,
+				AnimeID: anime.ID,
+				Error:   err,
+			}
+		}
+
+		return AnimeUpdatedMsg{
+			Success: true,
+			AnimeID: anime.ID,
+			Message: fmt.Sprintf("Updated progress for %s to %d/%d",
+				anime.Title.Preferred(m.config.UI.TitleLanguage),
+				anime.UserData.Progress,
+				anime.Episodes),
+		}
+	}
 }
 
 // handlePlayEpisode initiates playback of the next episode

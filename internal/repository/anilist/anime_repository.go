@@ -158,7 +158,173 @@ func (r *AnimeRepository) GetAllAnimeList(ctx context.Context) ([]*domain.Anime,
 }
 
 func (r *AnimeRepository) UpdateUserAnimeData(ctx context.Context, id int, data *domain.UserAnimeData) error {
-	panic("Not yet implemented")
+	mutation := `
+		mutation ($mediaId: Int, $status: MediaListStatus, $score: Float, $progress: Int, $notes: String) {
+			SaveMediaListEntry(
+				mediaId: $mediaId, 
+				status: $status, 
+				score: $score, 
+				progress: $progress,
+				notes: $notes
+			) {
+				id
+				status
+				score
+				progress
+				notes
+			}
+		}
+	`
+
+	// Convert domain.MediaStatus to string for the GraphQL API
+	variables := map[string]interface{}{
+		"mediaId":  id,
+		"status":   string(data.Status),
+		"score":    data.Score,
+		"progress": data.Progress,
+		"notes":    data.Notes,
+	}
+
+	// For date fields, we would need to parse and convert the format
+	// This can be added if needed for start/end dates
+
+	log.Debug("Updating anime data",
+		"mediaId", id,
+		"status", data.Status,
+		"score", data.Score,
+		"progress", data.Progress)
+
+	var response struct {
+		SaveMediaListEntry struct {
+			ID       int     `json:"id"`
+			Status   string  `json:"status"`
+			Score    float64 `json:"score"`
+			Progress int     `json:"progress"`
+			Notes    string  `json:"notes"`
+		}
+	}
+
+	if err := r.client.Query(ctx, mutation, variables, &response); err != nil {
+		log.Error("Failed to update anime data", "error", err, "mediaId", id)
+		return fmt.Errorf("failed to update anime data: %w", err)
+	}
+
+	log.Info("Successfully updated anime data",
+		"mediaId", id,
+		"listEntryId", response.SaveMediaListEntry.ID,
+		"status", response.SaveMediaListEntry.Status,
+		"progress", response.SaveMediaListEntry.Progress)
+
+	return nil
+}
+
+// UpdateAnime provides a structured way to update specific fields of an anime list entry
+func (r *AnimeRepository) UpdateAnime(ctx context.Context, params *domain.AnimeUpdateParams) (*domain.AnimeUpdateResult, error) {
+	mutation := `
+		mutation (
+			$mediaId: Int, 
+			$status: MediaListStatus, 
+			$score: Float, 
+			$progress: Int, 
+			$notes: String,
+			$startedAt: FuzzyDateInput,
+			$completedAt: FuzzyDateInput
+		) {
+			SaveMediaListEntry(
+				mediaId: $mediaId, 
+				status: $status, 
+				score: $score, 
+				progress: $progress,
+				notes: $notes,
+				startedAt: $startedAt,
+				completedAt: $completedAt
+			) {
+				id
+				mediaId
+				status
+				score
+				progress
+				notes
+				updatedAt
+				startedAt {
+					year
+					month
+					day
+				}
+				completedAt {
+					year
+					month
+					day
+				}
+			}
+		}
+	`
+
+	// Convert params to variables map
+	variables := params.ToAnimeUpdateVariables()
+
+	log.Debug("Updating anime data",
+		"mediaId", params.MediaID,
+		"variables", variables)
+
+	var response struct {
+		SaveMediaListEntry struct {
+			ID        int     `json:"id"`
+			MediaID   int     `json:"mediaId"`
+			Status    string  `json:"status"`
+			Score     float64 `json:"score"`
+			Progress  int     `json:"progress"`
+			Notes     string  `json:"notes"`
+			UpdatedAt int     `json:"updatedAt"`
+			StartedAt struct {
+				Year  int `json:"year"`
+				Month int `json:"month"`
+				Day   int `json:"day"`
+			} `json:"startedAt"`
+			CompletedAt struct {
+				Year  int `json:"year"`
+				Month int `json:"month"`
+				Day   int `json:"day"`
+			} `json:"completedAt"`
+		}
+	}
+
+	if err := r.client.Query(ctx, mutation, variables, &response); err != nil {
+		log.Error("Failed to update anime data", "error", err, "mediaId", params.MediaID)
+		return nil, fmt.Errorf("failed to update anime data: %w", err)
+	}
+
+	// Create the result
+	result := &domain.AnimeUpdateResult{
+		EntryID:   response.SaveMediaListEntry.ID,
+		MediaID:   response.SaveMediaListEntry.MediaID,
+		Status:    domain.MediaStatus(response.SaveMediaListEntry.Status),
+		Progress:  response.SaveMediaListEntry.Progress,
+		Score:     response.SaveMediaListEntry.Score,
+		Notes:     response.SaveMediaListEntry.Notes,
+		UpdatedAt: response.SaveMediaListEntry.UpdatedAt,
+	}
+
+	// Check for start date
+	startedAt := response.SaveMediaListEntry.StartedAt
+	if startedAt.Year > 0 {
+		result.StartDate = formatDate(startedAt.Year, startedAt.Month, startedAt.Day)
+	}
+
+	// Check for completion date
+	completedAt := response.SaveMediaListEntry.CompletedAt
+	if completedAt.Year > 0 {
+		result.CompletionDate = formatDate(completedAt.Year, completedAt.Month, completedAt.Day)
+	}
+
+	log.Info("Successfully updated anime data",
+		"mediaId", result.MediaID,
+		"listEntryId", result.EntryID,
+		"status", result.Status,
+		"progress", result.Progress,
+		"updatedAt", result.UpdatedAt)
+
+	return result, nil
 }
 
 func formatDate(year, month, day int) string {

@@ -11,3 +11,4 @@ Hisame is a TUI tool to help you manage your AniList.
 - Make anime list columns more dynamic and reactive to available width.  Allow some to shrink (to a minimum), and assign a priority to them for order to cull when there's not enough space.
 - Allow user to specify which columns are shown in the list view
 - Common search component to make search/text filtering consistent across the application
+- Fetch users preferred title from AniList.  Use this in place of config file preferred title option
