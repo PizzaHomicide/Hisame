@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/PizzaHomicide/hisame/internal/config"
+	"github.com/PizzaHomicide/hisame/internal/domain"
 	"github.com/PizzaHomicide/hisame/internal/log"
 	"io"
 	"net/http"
@@ -37,14 +38,31 @@ func NewPlayerService(config *config.Config) *PlayerService {
 }
 
 // FindEpisodes implements the Service FindEpisodes method
-func (s *PlayerService) FindEpisodes(ctx context.Context, animeID int, title string, synonyms []string) (*FindEpisodesResult, error) {
-	log.Debug("Finding episodes", "title", title, "id", animeID, "synonyms", synonyms)
+func (s *PlayerService) FindEpisodes(ctx context.Context, animeID int, title *domain.AnimeTitle, synonyms []string) (*FindEpisodesResult, error) {
+	log.Debug("Finding episodes", "title", title.Preferred, "id", animeID, "synonyms", synonyms)
 
-	// Search for shows matching the anime title
-	shows, err := s.animeClient.SearchShows(ctx, title, s.config.Player.TranslationType)
-	if err != nil {
-		return nil, fmt.Errorf("error searching for shows: %w", err)
+	// Search for shows matching the anime title.  Cycles through each language looking for a match, as sometimes
+	// we find one for one language, but not another.
+	titles := []string{title.Native, title.English, title.Romaji}
+	var allShows []AllAnimeShow
+
+	// Try each title format
+	for _, title := range titles {
+		if title == "" {
+			continue // Skip empty titles
+		}
+
+		shows, err := s.animeClient.SearchShows(ctx, title, s.config.Player.TranslationType)
+		if err != nil {
+			log.Warn("Error searching with title format", "title", title, "error", err)
+			continue // Try next format on error
+		}
+
+		// Add these shows to our collection
+		allShows = append(allShows, shows...)
 	}
+	// Deduplicate by AllAnime ID
+	shows := deduplicateShows(allShows)
 
 	if len(shows) == 0 {
 		return nil, errors.New("no candidate shows found")
@@ -99,13 +117,26 @@ func (s *PlayerService) FindEpisodes(ctx context.Context, animeID int, title str
 	return result, nil
 }
 
+func deduplicateShows(shows []AllAnimeShow) []AllAnimeShow {
+	seen := make(map[string]bool)
+	var result []AllAnimeShow
+
+	for _, show := range shows {
+		if !seen[show.ID] {
+			seen[show.ID] = true
+			result = append(result, show)
+		}
+	}
+
+	return result
+}
+
 // matchesByTitleOrSynonyms checks if a show matches the anime by title or synonyms
-func (s *PlayerService) matchesByTitleOrSynonyms(title string, synonyms []string, show AllAnimeShow) bool {
+func (s *PlayerService) matchesByTitleOrSynonyms(title *domain.AnimeTitle, synonyms []string, show AllAnimeShow) bool {
 	// Check if the anime title matches any of the show's names
-	animeTitle := strings.ToLower(title)
-	if strings.ToLower(show.Name) == animeTitle ||
-		strings.ToLower(show.EnglishName) == animeTitle ||
-		strings.ToLower(show.NativeName) == animeTitle {
+	if strings.ToLower(show.Name) == strings.ToLower(title.Romaji) ||
+		strings.ToLower(show.EnglishName) == strings.ToLower(title.English) ||
+		strings.ToLower(show.NativeName) == strings.ToLower(title.Native) {
 		log.Debug("Title match found", "title", title, "allanime_name", show.Name,
 			"allanime_englishname", show.EnglishName, "allanime_nativename", show.NativeName)
 		return true
@@ -114,12 +145,6 @@ func (s *PlayerService) matchesByTitleOrSynonyms(title string, synonyms []string
 	// Check if any of the show's alt names match any of the anime's synonyms
 	for _, altName := range show.TrustedAltNames {
 		altNameLower := strings.ToLower(altName)
-
-		// Check against anime title
-		if altNameLower == animeTitle {
-			log.Debug("Alt name match found", "alt_name", altName, "title", title)
-			return true
-		}
 
 		// Check against anime synonyms
 		for _, synonym := range synonyms {

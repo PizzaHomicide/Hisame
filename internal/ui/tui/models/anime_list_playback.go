@@ -141,7 +141,7 @@ func (m *AnimeListModel) loadEpisodes() tea.Cmd {
 		epResult, err := m.playerService.FindEpisodes(
 			ctx,
 			anime.ID,
-			anime.Title.Native,
+			&anime.Title,
 			anime.Synonyms,
 		)
 
@@ -172,7 +172,7 @@ func (m *AnimeListModel) loadNextEpisode(nextEpNumber int) tea.Cmd {
 		eps, err := m.playerService.FindEpisodes(
 			ctx,
 			anime.ID,
-			anime.Title.Native,
+			&anime.Title,
 			anime.Synonyms,
 		)
 

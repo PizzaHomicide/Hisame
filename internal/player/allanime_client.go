@@ -156,7 +156,7 @@ func (c *AllAnimeClient) SearchShows(ctx context.Context, query string, translat
 		return nil, fmt.Errorf("error searching shows: %w", err)
 	}
 
-	log.Debug("Search shows", "response", response)
+	log.Debug("Search shows", "response", response, "query", query)
 
 	return response.Shows.Edges, nil
 }
