@@ -100,9 +100,7 @@ func (m *AnimeListModel) applyFilters() {
 
 		// Filter for has new episodes if enabled
 		if m.filters.hasAvailableEpisodes {
-			// Check if there are unwatched available episodes
-			hasNewEps := anime.Episodes > 0 && anime.UserData.Progress < anime.Episodes
-			if !hasNewEps {
+			if !anime.HasUnwatchedEpisodes() {
 				includeAnime = false
 			}
 		}

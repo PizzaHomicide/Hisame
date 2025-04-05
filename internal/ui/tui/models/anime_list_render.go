@@ -66,8 +66,8 @@ func (m *AnimeListModel) renderAnimeList() string {
 	var listContent string
 
 	// Add column headers
-	headerText := fmt.Sprintf("%1s %-100s %8s %8s %5s %9s %12s",
-		" ", "Title", "Progress", "Format", "Score", "Status", "Next Ep")
+	headerText := fmt.Sprintf("%1s %-100s %8s %8s %5s %9s %5s %12s",
+		" ", "Title", "Progress", "Format", "Score", "Status", "Next #", "Airing In")
 	listContent += headerStyle.Render(headerText) + "\n"
 
 	// Add a separator line
@@ -99,11 +99,8 @@ func (m *AnimeListModel) renderAnimeList() string {
 // formatAnimeListItem formats a single anime list item for display
 func (m *AnimeListModel) formatAnimeListItem(anime *domain.Anime) string {
 	available := " " // Default: empty/space
-	if anime.UserData != nil && anime.Episodes > 0 {
-		// If the user hasn't watched all aired episodes
-		if anime.UserData.Progress < anime.Episodes {
-			available = "+"
-		}
+	if anime.HasUnwatchedEpisodes() {
+		available = "+"
 	}
 
 	title := anime.Title.Preferred(m.config.UI.TitleLanguage)
@@ -144,12 +141,18 @@ func (m *AnimeListModel) formatAnimeListItem(anime *domain.Anime) string {
 		meanScore = fmt.Sprintf("%.0f", anime.AverageScore)
 	}
 
-	// Next Airing
-	nextAiring := ""
+	// Next episode number
+	nextEpNum := ""
 	if anime.NextAiringEp != nil {
-		nextAiring = formatTimeUntilAiring(anime.NextAiringEp.TimeUntilAir)
+		nextEpNum = fmt.Sprintf("%d", anime.NextAiringEp.Episode)
+	}
+
+	// Airing countdown
+	airingIn := ""
+	if anime.NextAiringEp != nil {
+		airingIn = formatTimeUntilAiring(anime.NextAiringEp.TimeUntilAir)
 	} else if anime.Status == "FINISHED" {
-		nextAiring = fmt.Sprintf("%12s", "Finished")
+		airingIn = "Finished"
 	}
 
 	// Status indicator
@@ -171,14 +174,16 @@ func (m *AnimeListModel) formatAnimeListItem(anime *domain.Anime) string {
 		}
 	}
 
-	return fmt.Sprintf("%s %-40s %8s %8s %5s %9s %12s",
+	// Final formatted string
+	return fmt.Sprintf("%s %-40s %8s %8s %5s %9s %5s %12s",
 		available,
 		paddedTitle,
 		progress,
 		format,
 		meanScore,
 		statusText,
-		nextAiring)
+		nextEpNum,
+		airingIn)
 }
 
 // formatTimeUntilAiring formats a duration into a human-readable string

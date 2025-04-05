@@ -388,6 +388,11 @@ func (m *AppModel) handleOrchestrationMsg(msg tea.Msg) tea.Cmd {
 				_, cmd := m.animeListModel.Update(msg)
 				return cmd
 			}
+
+		case EpisodeEventError:
+			log.Warn("Could not find episode", "error", msg.Error)
+			m.animeListModel.DisableLoading()
+			return nil
 		}
 
 	case PlaybackMsg:

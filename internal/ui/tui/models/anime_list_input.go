@@ -247,6 +247,13 @@ func (m *AnimeListModel) handleDecrementProgress() (Model, tea.Cmd) {
 
 // handlePlayEpisode initiates playback of the next episode
 func (m *AnimeListModel) handlePlayEpisode() (Model, tea.Cmd) {
+	// Only attempt playback if there are unwatched episodes available
+	anime := m.getSelectedAnime()
+	if !anime.HasUnwatchedEpisodes() {
+		log.Info("No unwatched episodes available", "title", anime.Title.Preferred(m.config.UI.TitleLanguage),
+			"id", anime.ID, "progress", anime.UserData.Progress, "latest_aired", anime.GetLatestAiredEpisode())
+		return m, nil
+	}
 	nextEpNumber := m.getSelectedAnime().UserData.Progress + 1
 	log.Info("Play next episode",
 		"title", m.getSelectedAnime().Title.Preferred(m.config.UI.TitleLanguage),
