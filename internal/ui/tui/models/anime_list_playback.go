@@ -330,10 +330,15 @@ func (m *AnimeListModel) playEpisode(episode player.AllAnimeEpisodeInfo, anime *
 						switch event.Type {
 						case player.PlaybackEnded:
 							log.Info("MPV playback ended", "progress", event.Progress)
-							m.playbackCompletionCh <- PlaybackCompletedMsg{
-								AnimeID:       anime.ID,
-								EpisodeNumber: episode.OverallEpisodeNumber,
-								Progress:      event.Progress,
+							// Only send this event for "play next episode" scenario.  This is super fragile and I hate it
+							// but requires a full refactor of the playback flow to be better aligned with bubbletea best
+							// practices.  So it will come much later and this is just the pragmatic approach
+							if anime != nil {
+								m.playbackCompletionCh <- PlaybackCompletedMsg{
+									AnimeID:       anime.ID,
+									EpisodeNumber: episode.OverallEpisodeNumber,
+									Progress:      event.Progress,
+								}
 							}
 							return
 						case player.PlaybackError:
