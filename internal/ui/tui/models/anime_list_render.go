@@ -103,7 +103,7 @@ func (m *AnimeListModel) formatAnimeListItem(anime *domain.Anime) string {
 		available = "+"
 	}
 
-	title := anime.Title.Preferred(m.config.UI.TitleLanguage)
+	title := anime.Title.Preferred
 
 	// Truncate title to fit available space
 	titleWidth := 100

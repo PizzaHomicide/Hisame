@@ -22,7 +22,7 @@ func (m *AnimeListModel) handlePlaybackMessages(msg tea.Msg) (Model, tea.Cmd) {
 		switch msg.Type {
 		case PlaybackEventEpisodeFound:
 			log.Info("Next episode found, loading sources",
-				"title", msg.Anime.Title.Preferred(m.config.UI.TitleLanguage),
+				"title", msg.Anime.Title.Preferred,
 				"overall_epNum", msg.Episode.OverallEpisodeNumber,
 				"allanime_epNum", msg.Episode.AllAnimeEpisodeNumber,
 				"allanime_id", msg.Episode.AllAnimeID,
@@ -156,7 +156,7 @@ func (m *AnimeListModel) loadEpisodes() tea.Cmd {
 		return EpisodeMsg{
 			Type:     EpisodeEventLoaded,
 			Episodes: epResult.Episodes,
-			Title:    anime.Title.Preferred(m.config.UI.TitleLanguage),
+			Title:    anime.Title.Preferred,
 		}
 	}
 }

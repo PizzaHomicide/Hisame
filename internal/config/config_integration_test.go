@@ -43,7 +43,6 @@ func TestConfigIntegration(t *testing.T) {
 		// Verify default values
 		assert.Equal(t, "mpv", config.Player.Type)
 		assert.Equal(t, "sub", config.Player.TranslationType)
-		assert.Equal(t, "english", config.UI.TitleLanguage)
 		assert.Equal(t, "info", config.Logging.Level)
 		assert.NotEmpty(t, config.Logging.FilePath)
 
@@ -71,9 +70,7 @@ func TestConfigIntegration(t *testing.T) {
 				Args:            "--fullscreen",
 				TranslationType: "dub",
 			},
-			UI: UIConfig{
-				TitleLanguage: "romaji",
-			},
+			UI: UIConfig{},
 			Logging: LoggingConfig{
 				Level:    "error",
 				FilePath: "/var/log/hisame.log",
@@ -89,7 +86,6 @@ func TestConfigIntegration(t *testing.T) {
 		assert.Equal(t, "/usr/bin/vlc", loadedConfig.Player.Path)
 		assert.Equal(t, "--fullscreen", loadedConfig.Player.Args)
 		assert.Equal(t, "dub", loadedConfig.Player.TranslationType)
-		assert.Equal(t, "romaji", loadedConfig.UI.TitleLanguage)
 		assert.Equal(t, "error", loadedConfig.Logging.Level)
 		assert.Equal(t, "/var/log/hisame.log", loadedConfig.Logging.FilePath)
 	})
@@ -113,7 +109,6 @@ func TestConfigIntegration(t *testing.T) {
 		setupTestConfig(t)
 
 		setEnv(t, "HISAME_CONFIG_AUTH_TOKEN", "test-token")
-		setEnv(t, "HISAME_CONFIG_UI_TITLE_LANGUAGE", "romaji")
 		setEnv(t, "HISAME_CONFIG_PLAYER_TYPE", "custom")
 		setEnv(t, "HISAME_CONFIG_PLAYER_PATH", "/vlc")
 		setEnv(t, "HISAME_CONFIG_PLAYER_ARGS", "--fullscreen")
@@ -124,7 +119,6 @@ func TestConfigIntegration(t *testing.T) {
 		config := loadConfig(t)
 
 		assert.Equal(t, "test-token", config.Auth.Token)
-		assert.Equal(t, "romaji", config.UI.TitleLanguage)
 		assert.Equal(t, "custom", config.Player.Type)
 		assert.Equal(t, "/vlc", config.Player.Path)
 		assert.Equal(t, "--fullscreen", config.Player.Args)
@@ -134,11 +128,11 @@ func TestConfigIntegration(t *testing.T) {
 
 		// Remove the HISAME_CONFIG_UI_TITLE_LANGUAGE env var, then reload the config.
 		// This ensures that the env var overrides were not persisted to disk.
-		unsetEnv(t, "HISAME_CONFIG_UI_TITLE_LANGUAGE")
+		unsetEnv(t, "HISAME_CONFIG_LOGGING_LEVEL")
 
 		config = loadConfig(t)
 
-		assert.Equal(t, "english", config.UI.TitleLanguage)
+		assert.Equal(t, "info", config.Logging.Level)
 	})
 
 	t.Run("ModifyConfig", func(t *testing.T) {

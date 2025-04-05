@@ -30,9 +30,10 @@ type Anime struct {
 
 // AnimeTitle contains various versions of the anime title
 type AnimeTitle struct {
-	Romaji  string
-	English string
-	Native  string
+	Romaji    string
+	English   string
+	Native    string
+	Preferred string // Using preference from AniList
 }
 
 // AiringSchedule represents information about an upcoming episode
@@ -50,26 +51,6 @@ type UserAnimeData struct {
 	StartDate string
 	EndDate   string
 	Notes     string
-}
-
-// Preferred returns the anime title in the user's preferred language.
-// It follows a fallback order if the preferred title format is unavailable:
-//   - For "english" preference: English → Romaji → Native
-//   - For "romaji" preference: Romaji → English → Native
-//   - For "native" preference: Native → Romaji → English
-//
-// It will return an empty string only if all title formats are empty.
-func (at AnimeTitle) Preferred(preference string) string {
-	switch preference {
-	case "romaji":
-		return getFirstNonEmpty(at.Romaji, at.English, at.Native)
-	case "english":
-		return getFirstNonEmpty(at.English, at.Romaji, at.Native)
-	case "native":
-		return getFirstNonEmpty(at.Native, at.Romaji, at.English)
-	default: // Default to English preference if unspecified
-		return getFirstNonEmpty(at.English, at.Romaji, at.Native)
-	}
 }
 
 // getFirstNonEmpty returns the first non-empty string from the provided arguments

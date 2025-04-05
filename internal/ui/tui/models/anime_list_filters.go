@@ -120,7 +120,7 @@ func (m *AnimeListModel) applyFilters() {
 			query := strings.ToLower(m.filters.searchQuery)
 
 			// Check only the current anime being processed
-			title := strings.ToLower(anime.Title.Preferred(m.config.UI.TitleLanguage))
+			title := strings.ToLower(anime.Title.Preferred)
 			if !strings.Contains(title, query) {
 				includeAnime = false
 			}

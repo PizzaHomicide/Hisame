@@ -101,20 +101,20 @@ func (s *AnimeService) IncrementProgress(ctx context.Context, animeID int) error
 	// Log basic info about the update
 	log.Info("Incremented anime progress",
 		"animeID", animeID,
-		"title", anime.Title.Preferred("english"),
+		"title", anime.Title.Preferred,
 		"progress", fmt.Sprintf("%d/%d", result.Progress, totalEpisodes),
 		"status", result.Status)
 
 	// Log special messages for starting or completing
 	if currentProgress == 0 && newProgress == 1 {
 		log.Info("Started watching a new anime",
-			"title", anime.Title.Preferred("english"),
+			"title", anime.Title.Preferred,
 			"id", animeID)
 	}
 
 	if totalEpisodes > 0 && newProgress == totalEpisodes {
 		log.Info("Completed all episodes of anime",
-			"title", anime.Title.Preferred("english"),
+			"title", anime.Title.Preferred,
 			"id", animeID,
 			"episodes", totalEpisodes)
 	}
@@ -164,7 +164,7 @@ func (s *AnimeService) DecrementProgress(ctx context.Context, animeID int) error
 	// Log basic info about the update
 	log.Info("Decremented anime progress",
 		"animeID", animeID,
-		"title", anime.Title.Preferred("english"),
+		"title", anime.Title.Preferred,
 		"progress", fmt.Sprintf("%d/%d", result.Progress, totalEpisodes),
 		"status", result.Status)
 
@@ -175,7 +175,7 @@ func (s *AnimeService) DecrementProgress(ctx context.Context, animeID int) error
 
 	if previouslyCompleted && result.Status != domain.StatusCompleted {
 		log.Info("Anime un-completed",
-			"title", anime.Title.Preferred("english"),
+			"title", anime.Title.Preferred,
 			"id", animeID,
 			"new_status", result.Status)
 	}
@@ -199,7 +199,7 @@ func (s *AnimeService) syncAnimeWithUpdateResult(anime *domain.Anime, result *do
 
 	log.Debug("Synchronized local anime data with update result",
 		"animeID", anime.ID,
-		"title", anime.Title.Preferred("english"),
+		"title", anime.Title.Preferred,
 		"status", result.Status,
 		"progress", result.Progress)
 }

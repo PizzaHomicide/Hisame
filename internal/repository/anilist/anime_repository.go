@@ -29,6 +29,7 @@ func (r *AnimeRepository) GetAllAnimeList(ctx context.Context) ([]*domain.Anime,
                                 romaji
                                 english
                                 native
+								userPreferred
                             }
                             coverImage {
                                 large
@@ -69,9 +70,10 @@ func (r *AnimeRepository) GetAllAnimeList(ctx context.Context) ([]*domain.Anime,
 					Media struct {
 						ID    int
 						Title struct {
-							Romaji  string
-							English string
-							Native  string
+							Romaji        string
+							English       string
+							Native        string
+							UserPreferred string
 						}
 						CoverImage struct {
 							Large string
@@ -119,9 +121,10 @@ func (r *AnimeRepository) GetAllAnimeList(ctx context.Context) ([]*domain.Anime,
 			anime := &domain.Anime{
 				ID: entry.Media.ID,
 				Title: domain.AnimeTitle{
-					Romaji:  entry.Media.Title.Romaji,
-					English: entry.Media.Title.English,
-					Native:  entry.Media.Title.Native,
+					Romaji:    entry.Media.Title.Romaji,
+					English:   entry.Media.Title.English,
+					Native:    entry.Media.Title.Native,
+					Preferred: entry.Media.Title.UserPreferred,
 				},
 				CoverImage:   entry.Media.CoverImage.Large,
 				Episodes:     entry.Media.Episodes,

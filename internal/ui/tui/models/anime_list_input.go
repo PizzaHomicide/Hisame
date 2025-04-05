@@ -148,7 +148,7 @@ func (m *AnimeListModel) handleKeyPress(msg tea.KeyMsg) (Model, tea.Cmd) {
 		return m, nil
 	case "enter":
 		// TODO: Implement view detail of selected anime
-		log.Info("View anime detail", "title", m.getSelectedAnime().Title.Preferred(m.config.UI.TitleLanguage), "id", m.getSelectedAnime().ID)
+		log.Info("View anime detail", "title", m.getSelectedAnime().Title.Preferred, "id", m.getSelectedAnime().ID)
 	case "p":
 		return m.handlePlayEpisode()
 	case "ctrl+p":
@@ -180,7 +180,7 @@ func (m *AnimeListModel) handleIncrementProgress() (Model, tea.Cmd) {
 
 	return m, func() tea.Msg {
 		log.Info("Incrementing progress",
-			"title", anime.Title.Preferred(m.config.UI.TitleLanguage),
+			"title", anime.Title.Preferred,
 			"id", anime.ID,
 			"current_progress", anime.UserData.Progress)
 
@@ -201,7 +201,7 @@ func (m *AnimeListModel) handleIncrementProgress() (Model, tea.Cmd) {
 			Success: true,
 			AnimeID: anime.ID,
 			Message: fmt.Sprintf("Updated progress for %s to %d/%d",
-				anime.Title.Preferred(m.config.UI.TitleLanguage),
+				anime.Title.Preferred,
 				anime.UserData.Progress,
 				anime.Episodes),
 		}
@@ -217,7 +217,7 @@ func (m *AnimeListModel) handleDecrementProgress() (Model, tea.Cmd) {
 
 	return m, func() tea.Msg {
 		log.Info("Decrementing progress",
-			"title", anime.Title.Preferred(m.config.UI.TitleLanguage),
+			"title", anime.Title.Preferred,
 			"id", anime.ID,
 			"current_progress", anime.UserData.Progress)
 
@@ -238,7 +238,7 @@ func (m *AnimeListModel) handleDecrementProgress() (Model, tea.Cmd) {
 			Success: true,
 			AnimeID: anime.ID,
 			Message: fmt.Sprintf("Updated progress for %s to %d/%d",
-				anime.Title.Preferred(m.config.UI.TitleLanguage),
+				anime.Title.Preferred,
 				anime.UserData.Progress,
 				anime.Episodes),
 		}
@@ -250,13 +250,13 @@ func (m *AnimeListModel) handlePlayEpisode() (Model, tea.Cmd) {
 	// Only attempt playback if there are unwatched episodes available
 	anime := m.getSelectedAnime()
 	if !anime.HasUnwatchedEpisodes() {
-		log.Info("No unwatched episodes available", "title", anime.Title.Preferred(m.config.UI.TitleLanguage),
+		log.Info("No unwatched episodes available", "title", anime.Title.Preferred,
 			"id", anime.ID, "progress", anime.UserData.Progress, "latest_aired", anime.GetLatestAiredEpisode())
 		return m, nil
 	}
 	nextEpNumber := m.getSelectedAnime().UserData.Progress + 1
 	log.Info("Play next episode",
-		"title", m.getSelectedAnime().Title.Preferred(m.config.UI.TitleLanguage),
+		"title", m.getSelectedAnime().Title.Preferred,
 		"id", m.getSelectedAnime().ID,
 		"current_progress", m.getSelectedAnime().UserData.Progress,
 		"next_ep", nextEpNumber)
@@ -265,7 +265,7 @@ func (m *AnimeListModel) handlePlayEpisode() (Model, tea.Cmd) {
 	m.loading = true
 	m.loadingMsg = fmt.Sprintf("Finding episode %d for %s...",
 		nextEpNumber,
-		m.getSelectedAnime().Title.Preferred(m.config.UI.TitleLanguage))
+		m.getSelectedAnime().Title.Preferred)
 
 	return m, tea.Batch(
 		m.spinner.Tick,
@@ -276,12 +276,12 @@ func (m *AnimeListModel) handlePlayEpisode() (Model, tea.Cmd) {
 // handleChooseEpisode initiates the episode selection flow
 func (m *AnimeListModel) handleChooseEpisode() (Model, tea.Cmd) {
 	log.Info("Choose episode to play",
-		"title", m.getSelectedAnime().Title.Preferred(m.config.UI.TitleLanguage),
+		"title", m.getSelectedAnime().Title.Preferred,
 		"id", m.getSelectedAnime().ID)
 
 	m.loading = true
 	m.loadingMsg = fmt.Sprintf("Finding episodes for %s...",
-		m.getSelectedAnime().Title.Preferred(m.config.UI.TitleLanguage))
+		m.getSelectedAnime().Title.Preferred)
 
 	return m, tea.Batch(
 		m.spinner.Tick,

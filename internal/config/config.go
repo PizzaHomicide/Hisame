@@ -33,7 +33,6 @@ type PlayerConfig struct {
 
 // UIConfig contains UI display preferences
 type UIConfig struct {
-	TitleLanguage string `yaml:"title_language,omitempty"`
 }
 
 // LoggingConfig contains log related settings
@@ -162,9 +161,7 @@ func createBaseDefaultConfig() *Config {
 			Path:            "mpv",
 			TranslationType: "sub",
 		},
-		UI: UIConfig{
-			TitleLanguage: "english",
-		},
+		UI: UIConfig{},
 		Logging: LoggingConfig{
 			Level: "info",
 		},

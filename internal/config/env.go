@@ -24,11 +24,6 @@ var supportedEnvVars = []envVar{
 		apply: func(c *Config, s string) { c.Auth.Token = s },
 	},
 	{
-		name:  "HISAME_CONFIG_UI_TITLE_LANGUAGE",
-		desc:  "Sets the preferred title language for displaying anime titles.  Default: english",
-		apply: func(c *Config, s string) { c.UI.TitleLanguage = s },
-	},
-	{
 		name:  "HISAME_CONFIG_PLAYER_TYPE",
 		desc:  "Sets the video player type.  Should be one of `mpv` or `custom`.  Default: mpv",
 		apply: func(c *Config, s string) { c.Player.Type = s },
