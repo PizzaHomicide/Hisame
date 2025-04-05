@@ -29,20 +29,21 @@ type AnimeFilterSet struct {
 
 // AnimeListModel handles displaying and interacting with the anime list
 type AnimeListModel struct {
-	config        *config.Config
-	animeService  *service.AnimeService
-	playerService *player.PlayerService
-	width, height int
-	loading       bool
-	loadingMsg    string
-	loadError     error
-	spinner       spinner.Model
-	filters       AnimeFilterSet
-	cursor        int
-	allAnime      []*domain.Anime // All anime from the service
-	filteredAnime []*domain.Anime // Anime after applying filters
-	searchInput   textinput.Model
-	searchMode    bool // Whether we're in search input mode
+	config               *config.Config
+	animeService         *service.AnimeService
+	playerService        *player.PlayerService
+	width, height        int
+	loading              bool
+	loadingMsg           string
+	loadError            error
+	spinner              spinner.Model
+	filters              AnimeFilterSet
+	cursor               int
+	allAnime             []*domain.Anime // All anime from the service
+	filteredAnime        []*domain.Anime // Anime after applying filters
+	searchInput          textinput.Model
+	searchMode           bool // Whether we're in search input mode
+	playbackCompletionCh chan PlaybackCompletedMsg
 }
 
 // NewAnimeListModel creates a new anime list model
@@ -61,17 +62,18 @@ func NewAnimeListModel(cfg *config.Config, animeService *service.AnimeService) *
 	ti.Width = 30
 
 	return &AnimeListModel{
-		config:        cfg,
-		animeService:  animeService,
-		playerService: player.NewPlayerService(cfg),
-		loading:       false,
-		spinner:       s,
-		filters:       defaultFilters,
-		cursor:        0,
-		allAnime:      []*domain.Anime{},
-		filteredAnime: []*domain.Anime{},
-		searchInput:   ti,
-		searchMode:    false,
+		config:               cfg,
+		animeService:         animeService,
+		playerService:        player.NewPlayerService(cfg),
+		loading:              false,
+		spinner:              s,
+		filters:              defaultFilters,
+		cursor:               0,
+		allAnime:             []*domain.Anime{},
+		filteredAnime:        []*domain.Anime{},
+		searchInput:          ti,
+		searchMode:           false,
+		playbackCompletionCh: make(chan PlaybackCompletedMsg),
 	}
 }
 

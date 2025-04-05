@@ -7,6 +7,7 @@ package models
 import (
 	"context"
 	"fmt"
+	"github.com/PizzaHomicide/hisame/internal/domain"
 	"time"
 
 	"github.com/PizzaHomicide/hisame/internal/log"
@@ -21,10 +22,11 @@ func (m *AnimeListModel) handlePlaybackMessages(msg tea.Msg) (Model, tea.Cmd) {
 		switch msg.Type {
 		case PlaybackEventEpisodeFound:
 			log.Info("Next episode found, loading sources",
-				"title", msg.Episode.Title,
+				"title", msg.Anime.Title.Preferred(m.config.UI.TitleLanguage),
 				"overall_epNum", msg.Episode.OverallEpisodeNumber,
 				"allanime_epNum", msg.Episode.AllAnimeEpisodeNumber,
-				"allanime_id", msg.Episode.AllAnimeID)
+				"allanime_id", msg.Episode.AllAnimeID,
+				"anilist_id", msg.Anime.ID)
 
 			// Start loading the sources for this episode
 			m.loading = true
@@ -34,7 +36,7 @@ func (m *AnimeListModel) handlePlaybackMessages(msg tea.Msg) (Model, tea.Cmd) {
 
 			return m, tea.Batch(
 				m.spinner.Tick,
-				m.playEpisode(msg.Episode),
+				m.playEpisode(msg.Episode, msg.Anime),
 			)
 
 		case PlaybackEventSourcesLoaded:
@@ -83,7 +85,7 @@ func (m *AnimeListModel) handlePlaybackMessages(msg tea.Msg) (Model, tea.Cmd) {
 			log.Info("Playback started",
 				"title", msg.Episode.Title,
 				"episode", msg.Episode.AllAnimeEpisodeNumber)
-			return m, nil
+			return m, m.listenForPlaybackCompletion()
 
 		case PlaybackEventEnded:
 			m.loading = false
@@ -119,7 +121,7 @@ func (m *AnimeListModel) handlePlaybackMessages(msg tea.Msg) (Model, tea.Cmd) {
 
 				return m, tea.Batch(
 					m.spinner.Tick,
-					m.playEpisode(*msg.Episode),
+					m.playEpisode(*msg.Episode, nil),
 				)
 			}
 		}
@@ -209,12 +211,13 @@ func (m *AnimeListModel) loadNextEpisode(nextEpNumber int) tea.Cmd {
 		return PlaybackMsg{
 			Type:    PlaybackEventEpisodeFound,
 			Episode: *selectedEp,
+			Anime:   anime,
 		}
 	}
 }
 
-// playEpisode attempts to play the given episode
-func (m *AnimeListModel) playEpisode(episode player.AllAnimeEpisodeInfo) tea.Cmd {
+// playEpisode attempts to play the given episode.  Use nil `anime` to skip automatic progress updates
+func (m *AnimeListModel) playEpisode(episode player.AllAnimeEpisodeInfo, anime *domain.Anime) tea.Cmd {
 	return func() tea.Msg {
 		// Create a context with timeout for the entire operation
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
@@ -327,8 +330,10 @@ func (m *AnimeListModel) playEpisode(episode player.AllAnimeEpisodeInfo) tea.Cmd
 						switch event.Type {
 						case player.PlaybackEnded:
 							log.Info("MPV playback ended", "progress", event.Progress)
-							if event.Progress >= 75.0 {
-								log.Info("Would mark as completed!")
+							m.playbackCompletionCh <- PlaybackCompletedMsg{
+								AnimeID:       anime.ID,
+								EpisodeNumber: episode.OverallEpisodeNumber,
+								Progress:      event.Progress,
 							}
 							return
 						case player.PlaybackError:
@@ -377,5 +382,12 @@ func (m *AnimeListModel) playEpisode(episode player.AllAnimeEpisodeInfo) tea.Cmd
 				}
 			}
 		}
+	}
+}
+
+func (m *AnimeListModel) listenForPlaybackCompletion() tea.Cmd {
+	return func() tea.Msg {
+		event := <-m.playbackCompletionCh
+		return event
 	}
 }

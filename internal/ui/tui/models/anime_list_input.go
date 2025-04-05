@@ -81,6 +81,37 @@ func (m *AnimeListModel) Update(msg tea.Msg) (Model, tea.Cmd) {
 				"error", msg.Error)
 		}
 		return m, nil
+
+	case PlaybackCompletedMsg:
+		if msg.Progress < 75.0 {
+			log.Info("Playback ended.  Not incrementing progress as not enough of the episode was watched", "animeID", msg.AnimeID, "playbackProgress", msg.Progress)
+			return m, nil
+		}
+
+		return m, func() tea.Msg {
+			log.Info("Playback ended.  Incrementing progress", "animeID", msg.AnimeID, "playbackProgress", msg.Progress, "episode_watched", msg.EpisodeNumber)
+			// Increment anime progress
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			err := m.animeService.IncrementProgress(ctx, msg.AnimeID)
+
+			if err != nil {
+				return AnimeUpdatedMsg{
+					Success: false,
+					AnimeID: msg.AnimeID,
+					Error:   err,
+				}
+			}
+
+			return AnimeUpdatedMsg{
+				Success: true,
+				AnimeID: msg.AnimeID,
+				Message: fmt.Sprintf("Automatically updated progress after watching episode %d",
+					msg.EpisodeNumber),
+			}
+		}
+
 	}
 
 	// Handle other message types in the playback file

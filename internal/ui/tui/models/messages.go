@@ -36,6 +36,7 @@ const (
 type PlaybackMsg struct {
 	Type      PlaybackEventType
 	Episode   player.AllAnimeEpisodeInfo
+	Anime     *domain.Anime
 	Sources   *player.EpisodeSourceInfo
 	StreamURL string
 	Progress  float64
@@ -99,4 +100,11 @@ type AnimeUpdatedMsg struct {
 	AnimeID int
 	Message string
 	Error   error
+}
+
+// PlaybackCompletedMsg is used to transmit playback completion from goroutines
+type PlaybackCompletedMsg struct {
+	AnimeID       int
+	EpisodeNumber int
+	Progress      float64
 }
