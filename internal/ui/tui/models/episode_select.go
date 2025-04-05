@@ -188,8 +188,8 @@ func (m *EpisodeSelectModel) applyFilter() {
 		// Try fuzzy matching on episode numbers and title
 		if fuzzy.Match(query, epNumStr) ||
 			fuzzy.Match(query, ep.AllAnimeEpisodeNumber) ||
-			fuzzy.Match(query, ep.Title) ||
-			fuzzy.Match(query, ep.EnglishTitle) {
+			fuzzy.Match(query, ep.AllAnimeName) ||
+			fuzzy.Match(query, ep.PreferredTitle) {
 			filtered = append(filtered, ep)
 		}
 	}
@@ -296,10 +296,10 @@ func (m *EpisodeSelectModel) renderEpisodeList() string {
 	var headerText string
 	if m.hasMultiCours {
 		headerText = fmt.Sprintf("%-5s %-6s %-50s %-20s %10s",
-			"Ep #", "Cour #", "Title", "Season", "Source")
+			"Ep #", "Cour #", "AllAnimeName", "Season", "Source")
 	} else {
 		headerText = fmt.Sprintf("%-5s %-70s %-20s %10s",
-			"Ep #", "Title", "Season", "Source")
+			"Ep #", "AllAnimeName", "Season", "Source")
 	}
 	listContent += headerStyle.Render(headerText) + "\n"
 
@@ -334,7 +334,7 @@ func (m *EpisodeSelectModel) formatEpisodeListItem(episode player.AllAnimeEpisod
 	epNum := fmt.Sprintf("%d", episode.OverallEpisodeNumber)
 
 	// Get title and truncate it
-	title := episode.Title
+	title := episode.AllAnimeName
 
 	// Format season information
 	season := fmt.Sprintf("%s %d", episode.Season, episode.Year)

@@ -379,7 +379,7 @@ func (m *AppModel) handleOrchestrationMsg(msg tea.Msg) tea.Cmd {
 				log.Info("Episode selected from episode select model",
 					"overall_epNum", msg.Episode.OverallEpisodeNumber,
 					"allanime_epNum", msg.Episode.AllAnimeEpisodeNumber,
-					"title", msg.Episode.Title)
+					"title", msg.Episode.AllAnimeName)
 
 				// Pop episode select model
 				m.PopModel()

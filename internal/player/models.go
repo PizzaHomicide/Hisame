@@ -24,10 +24,9 @@ type AllAnimeEpisodeInfo struct {
 	// The episode number as represented on allanime
 	AllAnimeEpisodeNumber string
 	// The title of the anime on allanime
-	Title string
+	AllAnimeName string
 	// Additional titles from allanime
-	EnglishTitle string
-	NativeTitle  string
+	PreferredTitle string
 	// The alt names of the show
 	AltNames []string
 	// Airing date if available

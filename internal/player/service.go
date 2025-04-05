@@ -110,7 +110,7 @@ func (s *PlayerService) FindEpisodes(ctx context.Context, animeID int, title *do
 	})
 
 	// Build the episode list from matched shows
-	result := s.buildEpisodeList(matchedShows, animeID)
+	result := s.buildEpisodeList(matchedShows, animeID, title)
 
 	log.Debug("Built episode list", "matched_show_count", len(matchedShows), "episode_count", len(result.Episodes), "title", title)
 
@@ -137,7 +137,7 @@ func (s *PlayerService) matchesByTitleOrSynonyms(title *domain.AnimeTitle, synon
 	if strings.ToLower(show.Name) == strings.ToLower(title.Romaji) ||
 		strings.ToLower(show.EnglishName) == strings.ToLower(title.English) ||
 		strings.ToLower(show.NativeName) == strings.ToLower(title.Native) {
-		log.Debug("Title match found", "title", title, "allanime_name", show.Name,
+		log.Debug("AllAnimeName match found", "title", title, "allanime_name", show.Name,
 			"allanime_englishname", show.EnglishName, "allanime_nativename", show.NativeName)
 		return true
 	}
@@ -160,7 +160,7 @@ func (s *PlayerService) matchesByTitleOrSynonyms(title *domain.AnimeTitle, synon
 }
 
 // buildEpisodeList builds a chronologically ordered list of episodes from the matched shows
-func (s *PlayerService) buildEpisodeList(shows []AllAnimeShow, animeID int) *FindEpisodesResult {
+func (s *PlayerService) buildEpisodeList(shows []AllAnimeShow, animeID int, titles *domain.AnimeTitle) *FindEpisodesResult {
 	var episodes []AllAnimeEpisodeInfo
 	episodeOffset := 0
 
@@ -204,9 +204,8 @@ func (s *PlayerService) buildEpisodeList(shows []AllAnimeShow, animeID int) *Fin
 				AllAnimeID:            show.ID,
 				OverallEpisodeNumber:  overallEpNum,
 				AllAnimeEpisodeNumber: epStr,
-				Title:                 show.Name,
-				EnglishTitle:          show.EnglishName,
-				NativeTitle:           show.NativeName,
+				AllAnimeName:          show.Name,
+				PreferredTitle:        titles.Preferred,
 				AltNames:              show.TrustedAltNames,
 				AirDate:               show.AiredStart.ToTime(),
 				AniListID:             show.GetAniListID(),
@@ -258,7 +257,7 @@ func (s *PlayerService) GetEpisodeSources(ctx context.Context, animeInfo AllAnim
 
 	log.Info("Retrieved all episode sources",
 		"total_count", len(sources),
-		"title", animeInfo.Title,
+		"title", animeInfo.AllAnimeName,
 		"episode", animeInfo.AllAnimeEpisodeNumber)
 
 	// Filter sources to only include supported types (S-mp4 and Luf-mp4)
@@ -286,7 +285,7 @@ func (s *PlayerService) GetEpisodeSources(ctx context.Context, animeInfo AllAnim
 	})
 
 	return &EpisodeSourceInfo{
-		AnimeName:       animeInfo.Title,
+		AnimeName:       animeInfo.AllAnimeName,
 		EpisodeNumber:   animeInfo.AllAnimeEpisodeNumber,
 		AllAnimeID:      animeInfo.AllAnimeID,
 		Sources:         filteredSources,

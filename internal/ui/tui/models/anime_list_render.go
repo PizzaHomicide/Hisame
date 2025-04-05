@@ -67,7 +67,7 @@ func (m *AnimeListModel) renderAnimeList() string {
 
 	// Add column headers
 	headerText := fmt.Sprintf("%1s %-100s %8s %8s %5s %9s %5s %12s",
-		" ", "Title", "Progress", "Format", "Score", "Status", "Next #", "Airing In")
+		" ", "AllAnimeName", "Progress", "Format", "Score", "Status", "Next #", "Airing In")
 	listContent += headerStyle.Render(headerText) + "\n"
 
 	// Add a separator line

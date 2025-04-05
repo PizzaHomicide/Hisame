@@ -30,9 +30,9 @@ func (m *AnimeListModel) handlePlaybackMessages(msg tea.Msg) (Model, tea.Cmd) {
 
 			// Start loading the sources for this episode
 			m.loading = true
-			m.loadingMsg = fmt.Sprintf("Loading sources for episode %s of %s...",
-				msg.Episode.AllAnimeEpisodeNumber,
-				msg.Episode.Title)
+			m.loadingMsg = fmt.Sprintf("Loading sources for episode %d of %s...",
+				msg.Episode.OverallEpisodeNumber,
+				msg.Episode.PreferredTitle)
 
 			return m, tea.Batch(
 				m.spinner.Tick,
@@ -43,7 +43,7 @@ func (m *AnimeListModel) handlePlaybackMessages(msg tea.Msg) (Model, tea.Cmd) {
 			m.loading = false
 
 			log.Info("Episode sources loaded successfully",
-				"title", msg.Episode.Title,
+				"title", msg.Episode.AllAnimeName,
 				"episode", msg.Episode.AllAnimeEpisodeNumber,
 				"source_count", len(msg.Sources.Sources))
 
@@ -74,7 +74,7 @@ func (m *AnimeListModel) handlePlaybackMessages(msg tea.Msg) (Model, tea.Cmd) {
 			m.loading = false
 
 			log.Error("Failed to load episode sources",
-				"title", msg.Episode.Title,
+				"title", msg.Episode.AllAnimeName,
 				"episode", msg.Episode.AllAnimeEpisodeNumber,
 				"error", msg.Error)
 
@@ -83,21 +83,21 @@ func (m *AnimeListModel) handlePlaybackMessages(msg tea.Msg) (Model, tea.Cmd) {
 		case PlaybackEventStarted:
 			m.loading = false
 			log.Info("Playback started",
-				"title", msg.Episode.Title,
+				"title", msg.Episode.AllAnimeName,
 				"episode", msg.Episode.AllAnimeEpisodeNumber)
 			return m, m.listenForPlaybackCompletion()
 
 		case PlaybackEventEnded:
 			m.loading = false
 			log.Info("Playback ended",
-				"title", msg.Episode.Title,
+				"title", msg.Episode.AllAnimeName,
 				"episode", msg.Episode.AllAnimeEpisodeNumber,
 				"progress", msg.Progress)
 			return m, nil
 
 		case PlaybackEventProgress:
 			log.Debug("Playback progress",
-				"title", msg.Episode.Title,
+				"title", msg.Episode.AllAnimeName,
 				"episode", msg.Episode.AllAnimeEpisodeNumber,
 				"progress", msg.Progress)
 			return m, nil
@@ -111,13 +111,13 @@ func (m *AnimeListModel) handlePlaybackMessages(msg tea.Msg) (Model, tea.Cmd) {
 					"overall_epNum", msg.Episode.OverallEpisodeNumber,
 					"allanime_epNum", msg.Episode.AllAnimeEpisodeNumber,
 					"allanime_id", msg.Episode.AllAnimeID,
-					"title", msg.Episode.Title)
+					"title", msg.Episode.AllAnimeName)
 
 				// Start loading the sources
 				m.loading = true
-				m.loadingMsg = fmt.Sprintf("Loading sources for episode %s of %s...",
-					msg.Episode.AllAnimeEpisodeNumber,
-					msg.Episode.Title)
+				m.loadingMsg = fmt.Sprintf("Loading sources for episode %d of %s...",
+					msg.Episode.OverallEpisodeNumber,
+					msg.Episode.PreferredTitle)
 
 				return m, tea.Batch(
 					m.spinner.Tick,
@@ -225,7 +225,7 @@ func (m *AnimeListModel) playEpisode(episode player.AllAnimeEpisodeInfo, anime *
 
 		// Set loading state for source fetching
 		log.Info("Fetching sources for episode",
-			"title", episode.Title,
+			"title", episode.AllAnimeName,
 			"overall_epNum", episode.OverallEpisodeNumber,
 			"allanime_epNum", episode.AllAnimeEpisodeNumber)
 
@@ -277,7 +277,7 @@ func (m *AnimeListModel) playEpisode(episode player.AllAnimeEpisodeInfo, anime *
 
 		// Update loading message to indicate we're starting the player
 		m.loadingMsg = fmt.Sprintf("Launching media player for %s episode %s...",
-			episode.Title, episode.AllAnimeEpisodeNumber)
+			episode.AllAnimeName, episode.AllAnimeEpisodeNumber)
 
 		// Create a new context for the playback monitoring that's independent of this function
 		playbackCtx, playbackCancel := context.WithCancel(context.Background())
@@ -295,8 +295,8 @@ func (m *AnimeListModel) playEpisode(episode player.AllAnimeEpisodeInfo, anime *
 		}
 
 		// Update loading message to indicate we're waiting for playback to start
-		m.loadingMsg = fmt.Sprintf("Waiting for playback to start for %s episode %s...",
-			episode.Title, episode.AllAnimeEpisodeNumber)
+		m.loadingMsg = fmt.Sprintf("Waiting for playback to start for episode %d of %s...",
+			episode.OverallEpisodeNumber, episode.PreferredTitle)
 
 		// Wait for the first event (should be playback started or an error)
 		select {
