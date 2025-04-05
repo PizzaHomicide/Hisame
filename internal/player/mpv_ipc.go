@@ -25,6 +25,8 @@ type MPVIPCClient struct {
 type MPVEvent struct {
 	Event     string          `json:"event"`
 	Data      json.RawMessage `json:"data,omitempty"`
+	ID        int             `json:"id,omitempty"`
+	Name      string          `json:"name,omitempty"`
 	RequestID int             `json:"request_id,omitempty"`
 	Error     string          `json:"error,omitempty"`
 }
@@ -158,7 +160,6 @@ func (c *MPVIPCClient) readEvents() {
 			continue
 		}
 
-		log.Trace("Received MPV event", "event", event.Event)
 		c.events <- event
 	}
 
@@ -199,11 +200,6 @@ func (c *MPVIPCClient) SendCommand(cmd []interface{}) error {
 	return nil
 }
 
-// ObserveProperty starts observing an MPV property
-func (c *MPVIPCClient) ObserveProperty(id int, name string) error {
-	return c.SendCommand([]interface{}{"observe_property", id, name})
-}
-
 // WaitForPlaybackStart waits for MPV to start playing the media
 func (c *MPVIPCClient) WaitForPlaybackStart(ctx context.Context, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
@@ -214,9 +210,13 @@ func (c *MPVIPCClient) WaitForPlaybackStart(ctx context.Context, timeout time.Du
 		return fmt.Errorf("failed to query playback state: %w", err)
 	}
 
-	// Also observe playback-time to detect when playback actually starts
-	if err := c.ObserveProperty(1, "playback-time"); err != nil {
+	// Also observe playback-time ongoing to figure out when playback starts, and to track progress
+	if err := c.SendCommand([]interface{}{"observe_property", 1, "playback-time"}); err != nil {
 		log.Warn("Failed to observe playback-time property", "error", err)
+	}
+
+	if err := c.SendCommand([]interface{}{"observe_property", 2, "duration"}); err != nil {
+		log.Warn("Failed to observe duration property", "error", err)
 	}
 
 	// Wait for either an idle-active=false response or a playback-time property change

@@ -326,17 +326,14 @@ func (m *AnimeListModel) playEpisode(episode player.AllAnimeEpisodeInfo) tea.Cmd
 					for event := range eventCh {
 						switch event.Type {
 						case player.PlaybackEnded:
-							log.Info("MPV playback ended")
-							// TODO: Update the anime progress after successful playback
+							log.Info("MPV playback ended", "progress", event.Progress)
+							if event.Progress >= 75.0 {
+								log.Info("Would mark as completed!")
+							}
 							return
 						case player.PlaybackError:
 							log.Error("MPV playback error", "error", event.Error)
 							return
-						case player.PlaybackProgress:
-							// Log progress updates less frequently to avoid spam
-							if int(event.Progress)%2 == 0 {
-								log.Debug("MPV playback progress", "progress", event.Progress)
-							}
 						}
 					}
 					log.Debug("MPV event channel closed, stopping monitoring")

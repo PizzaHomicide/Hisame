@@ -2,6 +2,7 @@ package player
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -117,6 +118,12 @@ func (p *MPVPlayer) Play(ctx context.Context, url string) (<-chan PlaybackEvent,
 			Type: PlaybackStarted,
 		}
 
+		var playbackTime, duration float64
+		// Used for logging.  We want to log out progress updates infrequently and will be casting a float to an int,
+		// so will get many events for the same percentage number - therefore we need to track the last logged number
+		// so we don't spam logs of that one number
+		var lastLoggedProgress int = -1
+
 		// Keep processing events until MPV exits or context is cancelled
 		mpvEventCh := p.ipcClient.Events()
 		for {
@@ -128,7 +135,8 @@ func (p *MPVPlayer) Play(ctx context.Context, url string) (<-chan PlaybackEvent,
 				if !ok {
 					log.Debug("MPV event channel closed")
 					events <- PlaybackEvent{
-						Type: PlaybackEnded,
+						Type:     PlaybackEnded,
+						Progress: p.calculateProgressPercentage(playbackTime, duration),
 					}
 					return
 				}
@@ -137,15 +145,62 @@ func (p *MPVPlayer) Play(ctx context.Context, url string) (<-chan PlaybackEvent,
 				if event.Event == "end-file" {
 					log.Info("MPV playback ended")
 					events <- PlaybackEvent{
-						Type: PlaybackEnded,
+						Type:     PlaybackEnded,
+						Progress: p.calculateProgressPercentage(playbackTime, duration),
 					}
 					return
+				}
+				if event.Event == "property-change" {
+					if durationValue, err := p.extractEventDataFloat(event, "duration"); err == nil {
+						log.Trace("Setting video duration", "duration", durationValue)
+						duration = durationValue
+					}
+					if playbackValue, err := p.extractEventDataFloat(event, "playback-time"); err == nil {
+						log.Trace("Setting playback time", "playback-time", playbackValue)
+						playbackTime = playbackValue
+
+						progress := int(p.calculateProgressPercentage(playbackTime, duration))
+						if progress != lastLoggedProgress && (progress%5 == 0 || absInt(lastLoggedProgress-progress) >= 5) {
+							log.Info("Playback progress", "percent", progress)
+							lastLoggedProgress = progress
+						}
+					}
 				}
 			}
 		}
 	}()
 
 	return events, nil
+}
+
+func absInt(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
+}
+
+func (p *MPVPlayer) extractEventDataFloat(event MPVEvent, targetName string) (float64, error) {
+	if event.Name != targetName {
+		return 0.0, fmt.Errorf("event name %s does not match target name %s", event.Name, targetName)
+	}
+
+	var value float64
+	if err := json.Unmarshal(event.Data, &value); err != nil {
+		log.Warn("Failed to unmarshal event data", "data", string(event.Data))
+		return 0.0, fmt.Errorf("failed to unmarshal event data: %w", err)
+	} else {
+		log.Trace("Parsed value", "value", value, "name", targetName)
+		return value, nil
+	}
+}
+
+func (p *MPVPlayer) calculateProgressPercentage(playbackTime, duration float64) float64 {
+	log.Trace("Calculating progress percentage..", "playbackTime", playbackTime, "duration", duration)
+	if playbackTime == 0.0 || duration == 0.0 {
+		return 0.0
+	}
+	return (playbackTime / duration) * 100
 }
 
 // Stop stops playback if it's active

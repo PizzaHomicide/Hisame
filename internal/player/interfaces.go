@@ -14,8 +14,6 @@ const (
 	PlaybackEnded PlaybackEventType = "ended"
 	// PlaybackError indicates an error during playback
 	PlaybackError PlaybackEventType = "error"
-	// PlaybackProgress indicates a progress update
-	PlaybackProgress PlaybackEventType = "progress"
 )
 
 // PlaybackEvent represents an event from the video player
