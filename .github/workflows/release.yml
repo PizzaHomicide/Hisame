@@ -1,0 +1,159 @@
+name: Release Hisame Alpha Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g., 0.1.0)'
+        required: true
+        default: '0.1.0'
+      prerelease:
+        description: 'Is this a prerelease?'
+        type: boolean
+        required: true
+        default: true
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      version: ${{ github.event.inputs.version }}
+    steps:
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ github.event.inputs.version }}
+          release_name: Hisame v${{ github.event.inputs.version }}-alpha
+          draft: false
+          prerelease: ${{ github.event.inputs.prerelease }}
+          body: |
+            Hisame (氷雨) Alpha Release v${{ github.event.inputs.version }}
+            
+            This is an alpha release of Hisame, a TUI tool for managing your AniList.
+            
+            ## Installation
+            Download the appropriate binary for your platform and run it from a terminal.
+            
+            ## Known Issues
+            - See the TODO section in the README.md file for known issues and upcoming features.
+            
+            ## Feedback
+            Please report any issues in the GitHub issue tracker.
+
+  build:
+    needs: create-release
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-amd64
+            binary_name: hisame
+            asset_name: hisame-${{ needs.create-release.outputs.version }}-linux-amd64
+          - os: ubuntu-latest
+            target: linux-arm64
+            binary_name: hisame
+            asset_name: hisame-${{ needs.create-release.outputs.version }}-linux-arm64
+          - os: macos-latest
+            target: darwin-amd64
+            binary_name: hisame
+            asset_name: hisame-${{ needs.create-release.outputs.version }}-darwin-amd64
+          - os: macos-latest
+            target: darwin-arm64
+            binary_name: hisame
+            asset_name: hisame-${{ needs.create-release.outputs.version }}-darwin-arm64
+          - os: windows-latest
+            target: windows-amd64
+            binary_name: hisame.exe
+            asset_name: hisame-${{ needs.create-release.outputs.version }}-windows-amd64.exe
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.23'
+          check-latest: true
+
+      - name: Get dependencies
+        run: go mod download
+
+      # Set environment variables based on matrix target
+      - name: Set up environment for cross-compilation
+        shell: bash
+        run: |
+          if [[ "${{ matrix.target }}" == "linux-amd64" ]]; then
+            echo "GOOS=linux" >> $GITHUB_ENV
+            echo "GOARCH=amd64" >> $GITHUB_ENV
+          elif [[ "${{ matrix.target }}" == "linux-arm64" ]]; then
+            echo "GOOS=linux" >> $GITHUB_ENV
+            echo "GOARCH=arm64" >> $GITHUB_ENV
+          elif [[ "${{ matrix.target }}" == "darwin-amd64" ]]; then
+            echo "GOOS=darwin" >> $GITHUB_ENV
+            echo "GOARCH=amd64" >> $GITHUB_ENV
+          elif [[ "${{ matrix.target }}" == "darwin-arm64" ]]; then
+            echo "GOOS=darwin" >> $GITHUB_ENV
+            echo "GOARCH=arm64" >> $GITHUB_ENV
+          elif [[ "${{ matrix.target }}" == "windows-amd64" ]]; then
+            echo "GOOS=windows" >> $GITHUB_ENV
+            echo "GOARCH=amd64" >> $GITHUB_ENV
+          fi
+
+      # Inject build version
+      - name: Inject version
+        shell: bash
+        run: |
+          VERSION="${{ needs.create-release.outputs.version }}"
+          BUILD_TIME=$(date -u '+%Y-%m-%d_%H:%M:%S')
+          
+          # Use linker flags to inject version info
+          echo "VERSION_FLAGS=-X 'github.com/PizzaHomicide/hisame/internal/version.Version=$VERSION' -X 'github.com/PizzaHomicide/hisame/internal/version.BuildTime=$BUILD_TIME'" >> $GITHUB_ENV
+
+      # Build the binary
+      - name: Build
+        run: go build -v -ldflags "${{ env.VERSION_FLAGS }}" -o ${{ matrix.binary_name }} ./cmd/hisame
+
+      # Create archive for non-Windows platforms
+      - name: Create archive (non-Windows)
+        if: matrix.os != 'windows-latest'
+        shell: bash
+        run: |
+          tar czf ${{ matrix.asset_name }}.tar.gz ${{ matrix.binary_name }}
+
+      # Create ZIP for Windows platform
+      - name: Create archive (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        run: |
+          7z a -tzip ${{ matrix.asset_name }}.zip ${{ matrix.binary_name }}
+
+      # Upload archive (non-Windows)
+      - name: Upload Release Asset (non-Windows)
+        if: matrix.os != 'windows-latest'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./${{ matrix.asset_name }}.tar.gz
+          asset_name: ${{ matrix.asset_name }}.tar.gz
+          asset_content_type: application/gzip
+
+      # Upload archive (Windows)
+      - name: Upload Release Asset (Windows)
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./${{ matrix.asset_name }}.zip
+          asset_name: ${{ matrix.asset_name }}.zip
+          asset_content_type: application/zip

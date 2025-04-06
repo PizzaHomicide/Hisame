@@ -5,6 +5,7 @@ import (
 	"github.com/PizzaHomicide/hisame/internal/config"
 	"github.com/PizzaHomicide/hisame/internal/log"
 	"github.com/PizzaHomicide/hisame/internal/ui/tui"
+	"github.com/PizzaHomicide/hisame/internal/version"
 	"os"
 )
 
@@ -32,7 +33,7 @@ func main() {
 	// Set the default global logger
 	log.SetDefaultLogger(logger)
 
-	log.Info("Starting up Hisame", "version", "0.0.1")
+	log.Info("Starting up Hisame", "version", version.GetVersion(), "build_time", version.GetBuildTime())
 
 	if err := tui.Run(cfg); err != nil {
 		log.Error("Unhandled error while running TUI", "error", err)
