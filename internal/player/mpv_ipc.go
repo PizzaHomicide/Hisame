@@ -74,40 +74,17 @@ func GetMPVSocketPath() string {
 	return socketPath
 }
 
-// Connect establishes a connection with MPV
-func (c *MPVIPCClient) Connect(ctx context.Context) error {
-	// For Windows, use regular net.Dial with the named pipe
-	if runtime.GOOS == "windows" {
-		conn, err := net.Dial("tcp", c.socketPath)
-		if err != nil {
-			return fmt.Errorf("failed to connect to MPV pipe: %w", err)
-		}
-		c.conn = conn
-		go c.readEvents()
-		return nil
-	}
-
-	// For Unix systems, use Unix domain socket
-	var d net.Dialer
-	conn, err := d.DialContext(ctx, "unix", c.socketPath)
-	if err != nil {
-		return fmt.Errorf("failed to connect to MPV socket: %w", err)
-	}
-
-	c.conn = conn
-	go c.readEvents()
-	return nil
-}
-
 // WaitForConnection attempts to connect to MPV with retries
+// Platform-specific Connect() functions are implemented in
+// platform-specific files (mpv_windows.go, mpv_unix.go)
 func (c *MPVIPCClient) WaitForConnection(ctx context.Context, maxAttempts int, retryDelay time.Duration) error {
 	log.Debug("Waiting for MPV to create socket", "socket_path", c.socketPath, "max_attempts", maxAttempts)
 
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
-		// Check if socket file exists for unix sockets
+		// Check if socket file exists for unix sockets (skip for Windows)
 		if runtime.GOOS != "windows" {
 			if _, err := os.Stat(c.socketPath); os.IsNotExist(err) {
-				log.Debug("MPV socket does not exist yet", "attempt", attempt, "path", c.socketPath)
+				log.Debug("Socket does not exist yet", "attempt", attempt, "path", c.socketPath)
 				select {
 				case <-ctx.Done():
 					return ctx.Err()
@@ -124,7 +101,7 @@ func (c *MPVIPCClient) WaitForConnection(ctx context.Context, maxAttempts int, r
 			return nil
 		}
 
-		log.Debug("Failed to connect to MPV", "attempt", attempt, "error", err)
+		log.Warn("Failed to connect to MPV", "attempt", attempt, "error", err)
 
 		select {
 		case <-ctx.Done():

@@ -12,6 +12,7 @@ require (
 	github.com/lithammer/fuzzysearch v1.1.8
 	github.com/machinebox/graphql v0.2.2
 	github.com/mattn/go-runewidth v0.0.16
+	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce
 )
 
 require (

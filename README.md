@@ -12,3 +12,4 @@ Hisame is a TUI tool to help you manage your AniList.
 - Allow user to specify which columns are shown in the list view
 - Common search component to make search/text filtering consistent across the application
 - Fetch users preferred title from AniList.  Use this in place of config file preferred title option
+- [WINDOWS] MPV closes when the terminal is exited
