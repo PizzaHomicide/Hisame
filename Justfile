@@ -8,7 +8,7 @@ build:
 
 # Run the application
 run:
-    HISAME_CONFIG_PATH=./test-config.yml go run ./cmd/hisame
+    HISAME_CONFIG_PATH=./test-config.yml HISAME_CONFIG_LOGGING_FILE_PATH=./hisame.log go run ./cmd/hisame
 
 # Run all tests
 test:

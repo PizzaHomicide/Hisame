@@ -7,6 +7,7 @@ import (
 	"github.com/PizzaHomicide/hisame/internal/log"
 	"github.com/PizzaHomicide/hisame/internal/repository/anilist"
 	"github.com/PizzaHomicide/hisame/internal/service"
+	kb "github.com/PizzaHomicide/hisame/internal/ui/tui/keybindings"
 	tea "github.com/charmbracelet/bubbletea"
 	"os"
 )
@@ -164,46 +165,12 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	// Handle global key shortcuts first
-	if keyMsg, ok := msg.(tea.KeyMsg); ok {
-		switch keyMsg.String() {
-		case "ctrl+c":
-			log.Info("Quit command received. Shutting down...")
-			return m, tea.Quit
-
-		case "ctrl+h":
-			// Toggle help screen
-			if _, ok := m.CurrentModel().(*HelpModel); ok {
-				// Help is already active, pop it
-				m.PopModel()
-			} else {
-				// Get context from current model
-				context := ViewAnimeList // Default fallback
-				if currentModel := m.CurrentModel(); currentModel != nil {
-					context = currentModel.ViewType()
-				}
-
-				// Set context and push help model
-				m.helpModel.SetContext(context)
-				m.PushModel(m.helpModel)
-			}
-			return m, nil
-
-		case "ctrl+l":
-			// Logout
-			return m, m.handleLogout()
-
-		case "esc":
-			// If we have more than one model in the stack, pop the top one
-			if len(m.modelStack) > 1 {
-				m.PopModel()
-				return m, nil
-			}
-		}
+	if cmd := m.handleKeyMsg(msg); cmd != nil {
+		return m, cmd
 	}
 
 	// Handle orchestration messages
-	cmd := m.handleOrchestrationMsg(msg)
-	if cmd != nil {
+	if cmd := m.handleOrchestrationMsg(msg); cmd != nil {
 		return m, cmd
 	}
 
@@ -222,6 +189,31 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, cmd
+}
+
+func (m *AppModel) handleKeyMsg(msg tea.Msg) tea.Cmd {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch kb.GetActionByKey(msg.String(), kb.GlobalBindings) {
+		case kb.ActionQuit:
+			log.Info("Quit command received. Shutting down...")
+			return tea.Quit
+
+		case kb.ActionLogout:
+			return m.handleLogout()
+
+		case kb.ActionToggleHelp:
+			return m.handleToggleHelp()
+
+		case kb.ActionBack:
+			// If we have more than one model in the stack, pop the top one
+			if len(m.modelStack) > 1 {
+				m.PopModel()
+				return nil
+			}
+		}
+	}
+	return nil
 }
 
 // handleOrchestrationMsg handles messages that require coordination between models
@@ -418,6 +410,25 @@ func (m *AppModel) handleLogout() tea.Cmd {
 	m.authModel = NewAuthModel()
 	m.SetStack([]Model{m.authModel})
 
+	return nil
+}
+
+func (m *AppModel) handleToggleHelp() tea.Cmd {
+	// Toggle help screen
+	if _, ok := m.CurrentModel().(*HelpModel); ok {
+		// Help is already active, pop it
+		m.PopModel()
+	} else {
+		// Get context from current model
+		context := ViewAnimeList // Default fallback
+		if currentModel := m.CurrentModel(); currentModel != nil {
+			context = currentModel.ViewType()
+		}
+
+		// Set context and push help model
+		m.helpModel.SetContext(context)
+		m.PushModel(m.helpModel)
+	}
 	return nil
 }
 
