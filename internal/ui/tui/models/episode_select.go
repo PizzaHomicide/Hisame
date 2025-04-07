@@ -81,10 +81,6 @@ func (m *EpisodeSelectModel) Update(msg tea.Msg) (Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
-
 	case tea.KeyMsg:
 		// If in search mode, handle input differently
 		if m.searchMode {
