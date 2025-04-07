@@ -220,11 +220,6 @@ func (m *AppModel) handleKeyMsg(msg tea.Msg) tea.Cmd {
 func (m *AppModel) handleOrchestrationMsg(msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
 	case TokenValidationMsg:
-		// Pop the loading model
-		if len(m.modelStack) > 0 {
-			m.PopModel()
-		}
-
 		if !msg.Valid {
 			if msg.IsNetwork {
 				// Network error - show error and exit
@@ -247,7 +242,7 @@ func (m *AppModel) handleOrchestrationMsg(msg tea.Msg) tea.Cmd {
 			}
 
 			// Go to auth screen
-			m.PushModel(m.authModel)
+			m.SetStack([]Model{m.authModel})
 			return m.authModel.Init()
 		}
 
@@ -261,7 +256,7 @@ func (m *AppModel) handleOrchestrationMsg(msg tea.Msg) tea.Cmd {
 		m.animeListModel = animeListModel
 
 		// Push anime list model
-		m.PushModel(animeListModel)
+		m.SetStack([]Model{m.animeListModel})
 
 		// Now start loading the anime list data
 		return func() tea.Msg {
