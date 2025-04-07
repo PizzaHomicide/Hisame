@@ -19,11 +19,10 @@ const (
 	ActionMoveDown              Action = "move_down"
 	ActionPageUp                Action = "page_up"
 	ActionPageDown              Action = "page_down"
-	ActionViewAnimeDetail       Action = "view_anime_detail"
+	ActionSelectEpisode         Action = "select_episode"
 	ActionRefreshAnimeList      Action = "refresh_anime_list"
 	ActionPlayNextEpisode       Action = "play_next_episode"
-	ActionChooseEpisode         Action = "choose_episode"
-	ActionToggleSearch          Action = "toggle_search"
+	ActionOpenEpisodeSelector   Action = "episode_selector"
 	ActionIncrementProgress     Action = "increment_progress"
 	ActionDecrementProgress     Action = "decrement_progress"
 	ActionToggleStatusCurrent   Action = "toggle_status_current"
@@ -34,6 +33,10 @@ const (
 	ActionToggleStatusRepeating Action = "toggle_status_repeating"
 	ActionToggleNewEpisodes     Action = "toggle_new_episodes"
 	ActionToggleFinishedAiring  Action = "toggle_finished_airing"
+
+	// Search mode actions
+	ActionEnableSearch   Action = "enable_search"
+	ActionSearchComplete Action = "search_complete"
 )
 
 // KeyMap stores the mappings from actions to key sequences for each context
@@ -126,7 +129,7 @@ var AnimeListBindings = []Binding{
 		},
 	},
 	{
-		Action: ActionViewAnimeDetail,
+		Action: ActionSelectEpisode,
 		KeyMap: KeyMap{
 			Primary: "enter",
 			Help:    "View anime details",
@@ -147,17 +150,18 @@ var AnimeListBindings = []Binding{
 		},
 	},
 	{
-		Action: ActionChooseEpisode,
+		Action: ActionOpenEpisodeSelector,
 		KeyMap: KeyMap{
 			Primary: "ctrl+p",
 			Help:    "Choose episode to play",
 		},
 	},
 	{
-		Action: ActionToggleSearch,
+		Action: ActionEnableSearch,
 		KeyMap: KeyMap{
-			Primary: "ctrl+f",
-			Help:    "Search anime",
+			Primary:   "/",
+			Secondary: "ctrl+f",
+			Help:      "Search anime",
 		},
 	},
 	{
@@ -266,17 +270,37 @@ var EpisodeSelectBindings = []Binding{
 		},
 	},
 	{
-		Action: ActionViewAnimeDetail,
+		Action: ActionSelectEpisode,
 		KeyMap: KeyMap{
 			Primary: "enter",
 			Help:    "Select episode",
 		},
 	},
 	{
-		Action: ActionToggleSearch,
+		Action: ActionEnableSearch,
 		KeyMap: KeyMap{
-			Primary: "ctrl+f",
-			Help:    "Search episodes",
+			Primary:   "/",
+			Secondary: "ctrl+f",
+			Help:      "Search episodes",
+		},
+	},
+}
+
+// SearchModeBindings contains key bindings specific for when search mode is active
+var SearchModeBindings = []Binding{
+	{
+		Action: ActionBack,
+		KeyMap: KeyMap{
+			Primary:   "esc",
+			Secondary: "ctrl+f",
+			Help:      "Exit search mode and remove the filter",
+		},
+	},
+	{
+		Action: ActionSearchComplete,
+		KeyMap: KeyMap{
+			Primary: "enter",
+			Help:    "Apply the search filter and return control to the original view",
 		},
 	},
 }

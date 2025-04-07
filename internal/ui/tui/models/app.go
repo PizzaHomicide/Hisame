@@ -12,24 +12,6 @@ import (
 	"os"
 )
 
-// Model is the interface that all our models should implement
-type Model interface {
-	// Init initializes the model and returns any initial command
-	Init() tea.Cmd
-
-	// Update handles messages and returns the updated model and any command
-	Update(msg tea.Msg) (Model, tea.Cmd)
-
-	// View renders the model to a string
-	View() string
-
-	// Resize updates a models width & height
-	Resize(width, height int)
-
-	// ViewType returns the type of the view
-	ViewType() View
-}
-
 // AppModel is the main application model that coordinates all child models.  It is the high level wrapper.
 type AppModel struct {
 	config        *config.Config
@@ -164,6 +146,12 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	// Log any 'handled' messages
+	if handledMsg, ok := msg.(HandledMsg); ok {
+		log.Debug("HandledMsg received", "message", handledMsg.Message)
+		return m, nil
+	}
+
 	// Handle global key shortcuts first
 	if cmd := m.handleKeyMsg(msg); cmd != nil {
 		return m, cmd
@@ -206,7 +194,13 @@ func (m *AppModel) handleKeyMsg(msg tea.Msg) tea.Cmd {
 			return m.handleToggleHelp()
 
 		case kb.ActionBack:
-			// If we have more than one model in the stack, pop the top one
+			// First check if the current active model can handle a back action
+			var cmd tea.Cmd
+			if m.modelStack[len(m.modelStack)-1], cmd = m.CurrentModel().Update(msg); cmd != nil {
+				return cmd
+			}
+
+			// Otherwise, if we have more than one model in the stack, pop the top one
 			if len(m.modelStack) > 1 {
 				m.PopModel()
 				return nil

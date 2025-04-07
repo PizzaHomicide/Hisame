@@ -2,6 +2,8 @@ package models
 
 import (
 	"fmt"
+	"github.com/PizzaHomicide/hisame/internal/log"
+	kb "github.com/PizzaHomicide/hisame/internal/ui/tui/keybindings"
 	"strings"
 
 	"github.com/PizzaHomicide/hisame/internal/player"
@@ -73,7 +75,7 @@ func (m *EpisodeSelectModel) GetSelectedEpisode() *player.AllAnimeEpisodeInfo {
 
 // Init initializes the model
 func (m *EpisodeSelectModel) Init() tea.Cmd {
-	return textinput.Blink
+	return nil
 }
 
 // Update updates the model based on messages
@@ -83,71 +85,52 @@ func (m *EpisodeSelectModel) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		// If in search mode, handle input differently
-		if m.searchMode {
-			switch msg.String() {
-			case "esc":
-				// Cancel search
-				m.searchInput.SetValue("")
-				m.searchMode = false
-				m.applyFilter()
-				return m, nil
-			case "enter":
-				// Apply search and exit search mode
-				m.searchMode = false
-				m.applyFilter()
-				return m, nil
-			}
-
-			// Let the text input handle other keys
-			m.searchInput, cmd = m.searchInput.Update(msg)
-
-			// Apply filter as we type
-			m.applyFilter()
+		if cmd := m.handleSearchModeKeyMsg(msg); cmd != nil {
 			return m, cmd
 		}
 
-		// Normal mode key handling
-		switch msg.String() {
-		case "esc":
-			// This will be handled by the parent to close the modal
-			return m, nil
+		if cmd := m.handleKeyMsg(msg); cmd != nil {
+			return m, cmd
+		}
+	}
 
-		case "enter":
-			// Select the current episode
+	return m, cmd
+}
+
+func (m *EpisodeSelectModel) handleKeyMsg(msg tea.Msg) tea.Cmd {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch kb.GetActionByKey(msg.String(), kb.EpisodeSelectBindings) {
+		case kb.ActionSelectEpisode:
 			selectedEp := m.GetSelectedEpisode()
 			if selectedEp != nil {
-				return m, func() tea.Msg {
+				return func() tea.Msg {
 					return EpisodeMsg{
 						Type:    EpisodeEventSelected,
 						Episode: selectedEp,
 					}
 				}
 			}
-
-		case "up", "k":
-			if m.cursor > 0 {
-				m.cursor--
-				m.ensureCursorVisible()
-			}
-
-		case "down", "j":
+			log.Warn("Empty episode selected.  This should not be possible")
+			return Handled("err:episode_select:empty_episode_selection")
+		case kb.ActionEnableSearch:
+			m.searchMode = true
+			m.searchInput.Focus()
+			return Handled("search:enable")
+		case kb.ActionMoveDown:
 			if len(m.filtered) > 0 && m.cursor < len(m.filtered)-1 {
 				m.cursor++
 				m.ensureCursorVisible()
 			}
-
-		case "page-up":
-			// Move up by a page
-			pageSize := m.height - 10 // Approximate
-			m.cursor -= pageSize
-			if m.cursor < 0 {
-				m.cursor = 0
+			return Handled("cursor_move:down")
+		case kb.ActionMoveUp:
+			if m.cursor > 0 {
+				m.cursor--
+				m.ensureCursorVisible()
 			}
-			m.ensureCursorVisible()
-
-		case "page-down":
-			// Move down by a page
-			pageSize := m.height - 10 // Approximate
+			return Handled("cursor_move:up")
+		case kb.ActionPageDown:
+			pageSize := m.height - 11
 			m.cursor += pageSize
 			if m.cursor >= len(m.filtered) {
 				m.cursor = len(m.filtered) - 1
@@ -156,16 +139,53 @@ func (m *EpisodeSelectModel) Update(msg tea.Msg) (Model, tea.Cmd) {
 				m.cursor = 0
 			}
 			m.ensureCursorVisible()
-
-		case "ctrl+f":
-			// Enter search mode
-			m.searchMode = true
-			m.searchInput.Focus()
-			return m, textinput.Blink
+			return Handled("cursor_move:pgdown")
+		case kb.ActionPageUp:
+			pageSize := m.height - 11
+			m.cursor -= pageSize
+			if m.cursor < 0 {
+				m.cursor = 0
+			}
+			m.ensureCursorVisible()
+			return Handled("cursor_move:pgup")
 		}
-	}
 
-	return m, cmd
+	}
+	return nil
+}
+
+func (m *EpisodeSelectModel) handleSearchModeKeyMsg(msg tea.Msg) tea.Cmd {
+	if !m.searchMode {
+		return nil
+	}
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch kb.GetActionByKey(msg.String(), kb.SearchModeBindings) {
+		case kb.ActionBack:
+			// Cancels search, clearing the filter
+			m.searchMode = false
+			m.searchInput.SetValue("")
+			m.applyFilter()
+			//m.ensureCursorVisible()
+			return Handled("search:exit")
+		case kb.ActionSearchComplete:
+			m.searchMode = false
+			m.applyFilter()
+			//m.ensureCursorVisible()
+			return Handled("search:apply")
+		}
+
+		// Let the text input model handle other keys
+		var cmd tea.Cmd
+		m.searchInput, cmd = m.searchInput.Update(msg)
+
+		// Apply filters as we type
+		m.applyFilter()
+		m.ensureCursorVisible()
+
+		return cmd
+	}
+	return nil
 }
 
 // applyFilter filters episodes based on search input
@@ -198,20 +218,59 @@ func (m *EpisodeSelectModel) applyFilter() {
 	} else if m.cursor >= len(m.filtered) {
 		m.cursor = len(m.filtered) - 1
 	}
+	m.ensureCursorVisible()
+
 }
 
 // ensureCursorVisible adjusts the viewport offset to keep the cursor visible
 func (m *EpisodeSelectModel) ensureCursorVisible() {
-	availableHeight := m.height - 10 // Adjust for header and footer
+	// If no filtered episodes, reset cursor and offset
+	if len(m.filtered) == 0 {
+		m.cursor = 0
+		m.viewportOffset = 0
+		return
+	}
 
-	// If cursor is above viewport, scroll up
+	// Ensure cursor is within filtered episodes range
+	if m.cursor < 0 {
+		m.cursor = 0
+	}
+	if m.cursor >= len(m.filtered) {
+		m.cursor = len(m.filtered) - 1
+	}
+
+	// Calculate available height for the list
+	availableHeight := m.height - 10 // Subtract space for header, footer, and margins
+	if availableHeight < 1 {
+		availableHeight = 1
+	}
+
+	// Adjust viewport to show as many entries as possible from the start
+	// while keeping the cursor visible
+	visibleCount := min(len(m.filtered), availableHeight-1)
+
+	// If total filtered entries fit in viewport, reset offset
+	if len(m.filtered) <= visibleCount {
+		m.viewportOffset = 0
+		return
+	}
+
+	// Ensure cursor is within current viewport
 	if m.cursor < m.viewportOffset {
+		// Cursor is above viewport, adjust offset
 		m.viewportOffset = m.cursor
 	}
 
-	// If cursor is below viewport, scroll down
-	if m.cursor >= m.viewportOffset+availableHeight {
-		m.viewportOffset = m.cursor - availableHeight + 1
+	// Ensure cursor is within visible range from the bottom
+	if m.cursor >= m.viewportOffset+visibleCount {
+		// Cursor is below viewport, adjust offset to show last entries
+		m.viewportOffset = max(0, m.cursor-visibleCount+1)
+	}
+
+	// Additional check to ensure we can fill the viewport if possible
+	maxPossibleOffset := max(0, len(m.filtered)-visibleCount)
+	if m.viewportOffset > maxPossibleOffset {
+		m.viewportOffset = maxPossibleOffset
 	}
 }
 

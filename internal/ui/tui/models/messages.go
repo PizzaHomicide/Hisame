@@ -108,3 +108,16 @@ type PlaybackCompletedMsg struct {
 	EpisodeNumber int
 	Progress      float64
 }
+
+// HandledMsg is used when a model wants to bubble up the fact that it handled a message
+// and that further processing is likely not required (though the orchestration layer still
+// CAN do further processing if it deems necessary).
+type HandledMsg struct {
+	Message string // A message that will be debug logged
+}
+
+func Handled(message string) tea.Cmd {
+	return func() tea.Msg {
+		return HandledMsg{Message: message}
+	}
+}
