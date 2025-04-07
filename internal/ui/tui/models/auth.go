@@ -3,6 +3,7 @@ package models
 import (
 	"github.com/PizzaHomicide/hisame/internal/auth"
 	"github.com/PizzaHomicide/hisame/internal/log"
+	kb "github.com/PizzaHomicide/hisame/internal/ui/tui/keybindings"
 	"github.com/PizzaHomicide/hisame/internal/ui/tui/styles"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -45,8 +46,8 @@ func (m *AuthModel) Init() tea.Cmd {
 func (m *AuthModel) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "l":
+		switch kb.GetActionByKey(msg.String(), kb.AuthBindings) {
+		case kb.ActionLogin:
 			log.Info("Start login..")
 			m.authInProgress = true
 			return m, m.startAuth()

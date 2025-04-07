@@ -1,3 +1,5 @@
 .idea/
+bin/
 hisame
 hisame.exe
+test-config.yml
