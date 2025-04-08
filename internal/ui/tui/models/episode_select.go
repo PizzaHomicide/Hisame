@@ -95,92 +95,85 @@ func (m *EpisodeSelectModel) Update(msg tea.Msg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *EpisodeSelectModel) handleKeyMsg(msg tea.Msg) tea.Cmd {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch kb.GetActionByKey(msg.String(), kb.EpisodeSelectBindings) {
-		case kb.ActionSelectEpisode:
-			selectedEp := m.GetSelectedEpisode()
-			if selectedEp != nil {
-				return func() tea.Msg {
-					return EpisodeMsg{
-						Type:    EpisodeEventSelected,
-						Episode: selectedEp,
-					}
+func (m *EpisodeSelectModel) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
+	switch kb.GetActionByKey(msg.String(), kb.EpisodeSelectBindings) {
+	case kb.ActionSelectEpisode:
+		selectedEp := m.GetSelectedEpisode()
+		if selectedEp != nil {
+			return func() tea.Msg {
+				return EpisodeMsg{
+					Type:    EpisodeEventSelected,
+					Episode: selectedEp,
 				}
 			}
-			log.Warn("Empty episode selected.  This should not be possible")
-			return Handled("err:episode_select:empty_episode_selection")
-		case kb.ActionEnableSearch:
-			m.searchMode = true
-			m.searchInput.Focus()
-			return Handled("search:enable")
-		case kb.ActionMoveDown:
-			if len(m.filtered) > 0 && m.cursor < len(m.filtered)-1 {
-				m.cursor++
-				m.ensureCursorVisible()
-			}
-			return Handled("cursor_move:down")
-		case kb.ActionMoveUp:
-			if m.cursor > 0 {
-				m.cursor--
-				m.ensureCursorVisible()
-			}
-			return Handled("cursor_move:up")
-		case kb.ActionPageDown:
-			pageSize := m.height - 11
-			m.cursor += pageSize
-			if m.cursor >= len(m.filtered) {
-				m.cursor = len(m.filtered) - 1
-			}
-			if m.cursor < 0 {
-				m.cursor = 0
-			}
-			m.ensureCursorVisible()
-			return Handled("cursor_move:pgdown")
-		case kb.ActionPageUp:
-			pageSize := m.height - 11
-			m.cursor -= pageSize
-			if m.cursor < 0 {
-				m.cursor = 0
-			}
-			m.ensureCursorVisible()
-			return Handled("cursor_move:pgup")
 		}
-
+		log.Warn("Empty episode selected.  This should not be possible")
+		return Handled("err:episode_select:empty_episode_selection")
+	case kb.ActionEnableSearch:
+		m.searchMode = true
+		m.searchInput.Focus()
+		return Handled("search:enable")
+	case kb.ActionMoveDown:
+		if len(m.filtered) > 0 && m.cursor < len(m.filtered)-1 {
+			m.cursor++
+			m.ensureCursorVisible()
+		}
+		return Handled("cursor_move:down")
+	case kb.ActionMoveUp:
+		if m.cursor > 0 {
+			m.cursor--
+			m.ensureCursorVisible()
+		}
+		return Handled("cursor_move:up")
+	case kb.ActionPageDown:
+		pageSize := m.height - 11
+		m.cursor += pageSize
+		if m.cursor >= len(m.filtered) {
+			m.cursor = len(m.filtered) - 1
+		}
+		if m.cursor < 0 {
+			m.cursor = 0
+		}
+		m.ensureCursorVisible()
+		return Handled("cursor_move:pgdown")
+	case kb.ActionPageUp:
+		pageSize := m.height - 11
+		m.cursor -= pageSize
+		if m.cursor < 0 {
+			m.cursor = 0
+		}
+		m.ensureCursorVisible()
+		return Handled("cursor_move:pgup")
 	}
+
 	return nil
 }
 
-func (m *EpisodeSelectModel) handleSearchModeKeyMsg(msg tea.Msg) tea.Cmd {
+func (m *EpisodeSelectModel) handleSearchModeKeyMsg(msg tea.KeyMsg) tea.Cmd {
 	if !m.searchMode {
 		return nil
 	}
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch kb.GetActionByKey(msg.String(), kb.SearchModeBindings) {
-		case kb.ActionBack:
-			// Cancels search, clearing the filter
-			m.searchMode = false
-			m.searchInput.SetValue("")
-			m.applyFilter()
-			return Handled("search:exit")
-		case kb.ActionSearchComplete:
-			m.searchMode = false
-			m.applyFilter()
-			return Handled("search:apply")
-		}
-
-		// Let the text input model handle other keys
-		var cmd tea.Cmd
-		m.searchInput, cmd = m.searchInput.Update(msg)
-
-		// Apply filters as we type
+	switch kb.GetActionByKey(msg.String(), kb.SearchModeBindings) {
+	case kb.ActionBack:
+		// Cancels search, clearing the filter
+		m.searchMode = false
+		m.searchInput.SetValue("")
 		m.applyFilter()
-
-		return cmd
+		return Handled("search:exit")
+	case kb.ActionSearchComplete:
+		m.searchMode = false
+		m.applyFilter()
+		return Handled("search:apply")
 	}
-	return nil
+
+	// Let the text input model handle other keys
+	var cmd tea.Cmd
+	m.searchInput, cmd = m.searchInput.Update(msg)
+
+	// Apply filters as we type
+	m.applyFilter()
+
+	return cmd
 }
 
 // applyFilter filters episodes based on search input

@@ -98,39 +98,34 @@ func (m *AnimeListModel) Update(msg tea.Msg) (Model, tea.Cmd) {
 	return m.handlePlaybackMessages(msg)
 }
 
-func (m *AnimeListModel) handleSearchModeKeyMsg(msg tea.Msg) tea.Cmd {
+func (m *AnimeListModel) handleSearchModeKeyMsg(msg tea.KeyMsg) tea.Cmd {
 	if !m.searchMode {
 		return nil
 	}
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch kb.GetActionByKey(msg.String(), kb.SearchModeBindings) {
-		case kb.ActionBack:
-			// Cancels search, clearing the filter
-			m.searchMode = false
-			m.filters.searchQuery = "" // TODO: This seems redundant, align with how episode_select filter works
-			m.searchInput.SetValue("")
-			m.applyFilters()
-			return Handled("search:exit")
-		case kb.ActionSearchComplete:
-			m.searchMode = false
-			m.filters.searchQuery = m.searchInput.Value()
-			m.applyFilters()
-			return Handled("search:apply")
-		}
-
-		// Let the text input model handle other keys
-		var cmd tea.Cmd
-		m.searchInput, cmd = m.searchInput.Update(msg)
-
-		// Apply filters as we type
+	switch kb.GetActionByKey(msg.String(), kb.SearchModeBindings) {
+	case kb.ActionBack:
+		// Cancels search, clearing the filter
+		m.searchMode = false
+		m.filters.searchQuery = "" // TODO: This seems redundant, align with how episode_select filter works
+		m.searchInput.SetValue("")
+		m.applyFilters()
+		return Handled("search:exit")
+	case kb.ActionSearchComplete:
+		m.searchMode = false
 		m.filters.searchQuery = m.searchInput.Value()
 		m.applyFilters()
-
-		return cmd
-
+		return Handled("search:apply")
 	}
-	return nil
+
+	// Let the text input model handle other keys
+	var cmd tea.Cmd
+	m.searchInput, cmd = m.searchInput.Update(msg)
+
+	// Apply filters as we type
+	m.filters.searchQuery = m.searchInput.Value()
+	m.applyFilters()
+
+	return cmd
 }
 
 // handleKeyPress processes keyboard inputs in normal mode
