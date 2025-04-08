@@ -1,5 +1,7 @@
 package keybindings
 
+import tea "github.com/charmbracelet/bubbletea"
+
 // Action represents a specific action that can be triggered by a key
 type Action string
 
@@ -39,6 +41,25 @@ const (
 	ActionSearchComplete Action = "search_complete"
 )
 
+// ContextName represents a specific UI context in the application that has its own keybinds
+type ContextName string
+
+const (
+	ContextGlobal           ContextName = "global"
+	ContextAuth             ContextName = "auth"
+	ContextAnimeList        ContextName = "anime_list"
+	ContextEpisodeSelection ContextName = "episode_selection"
+	ContextSearchMode       ContextName = "search_mode"
+)
+
+var contextBindings = map[ContextName][]Binding{
+	ContextGlobal:           globalBindings,
+	ContextAuth:             authBindings,
+	ContextAnimeList:        animeListBindings,
+	ContextEpisodeSelection: episodeSelectBindings,
+	ContextSearchMode:       searchModeBindings,
+}
+
 // KeyMap stores the mappings from actions to key sequences for each context
 type KeyMap struct {
 	Primary   string
@@ -52,8 +73,8 @@ type Binding struct {
 	KeyMap KeyMap
 }
 
-// GlobalBindings contains key bindings that work across all views
-var GlobalBindings = []Binding{
+// globalBindings contains key bindings that work across all views
+var globalBindings = []Binding{
 	{
 		Action: ActionQuit,
 		KeyMap: KeyMap{
@@ -84,8 +105,8 @@ var GlobalBindings = []Binding{
 	},
 }
 
-// AuthBindings contains key bindings specific to the auth view
-var AuthBindings = []Binding{
+// authBindings contains key bindings specific to the auth view
+var authBindings = []Binding{
 	{
 		Action: ActionLogin,
 		KeyMap: KeyMap{
@@ -96,8 +117,8 @@ var AuthBindings = []Binding{
 	},
 }
 
-// AnimeListBindings contains key bindings specific to the anime list view
-var AnimeListBindings = []Binding{
+// animeListBindings contains key bindings specific to the anime list view
+var animeListBindings = []Binding{
 	{
 		Action: ActionMoveUp,
 		KeyMap: KeyMap{
@@ -231,8 +252,8 @@ var AnimeListBindings = []Binding{
 	},
 }
 
-// EpisodeSelectBindings contains key bindings specific to the episode selection view
-var EpisodeSelectBindings = []Binding{
+// episodeSelectBindings contains key bindings specific to the episode selection view
+var episodeSelectBindings = []Binding{
 	{
 		Action: ActionMoveUp,
 		KeyMap: KeyMap{
@@ -280,8 +301,8 @@ var EpisodeSelectBindings = []Binding{
 	},
 }
 
-// SearchModeBindings contains key bindings specific for when search mode is active
-var SearchModeBindings = []Binding{
+// searchModeBindings contains key bindings specific for when search mode is active
+var searchModeBindings = []Binding{
 	{
 		Action: ActionBack,
 		KeyMap: KeyMap{
@@ -330,10 +351,13 @@ func GetBindingByKey(key string, bindings []Binding) (Action, string) {
 }
 
 // GetActionByKey returns just the action for a given key, or an empty Action if not found
-func GetActionByKey(key string, bindings []Binding) Action {
-	for _, binding := range bindings {
-		if binding.KeyMap.Primary == key || binding.KeyMap.Secondary == key {
-			return binding.Action
+func GetActionByKey(keyMsg tea.KeyMsg, name ContextName) Action {
+	if bindings, exists := contextBindings[name]; exists {
+		key := keyMsg.String()
+		for _, binding := range bindings {
+			if binding.KeyMap.Primary == key || binding.KeyMap.Secondary == key {
+				return binding.Action
+			}
 		}
 	}
 	return ""

@@ -96,7 +96,7 @@ func (m *EpisodeSelectModel) Update(msg tea.Msg) (Model, tea.Cmd) {
 }
 
 func (m *EpisodeSelectModel) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
-	switch kb.GetActionByKey(msg.String(), kb.EpisodeSelectBindings) {
+	switch kb.GetActionByKey(msg, kb.ContextEpisodeSelection) {
 	case kb.ActionSelectEpisode:
 		selectedEp := m.GetSelectedEpisode()
 		if selectedEp != nil {
@@ -153,7 +153,7 @@ func (m *EpisodeSelectModel) handleSearchModeKeyMsg(msg tea.KeyMsg) tea.Cmd {
 	if !m.searchMode {
 		return nil
 	}
-	switch kb.GetActionByKey(msg.String(), kb.SearchModeBindings) {
+	switch kb.GetActionByKey(msg, kb.ContextSearchMode) {
 	case kb.ActionBack:
 		// Cancels search, clearing the filter
 		m.searchMode = false

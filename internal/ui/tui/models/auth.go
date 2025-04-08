@@ -46,7 +46,7 @@ func (m *AuthModel) Init() tea.Cmd {
 func (m *AuthModel) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch kb.GetActionByKey(msg.String(), kb.AuthBindings) {
+		switch kb.GetActionByKey(msg, kb.ContextAuth) {
 		case kb.ActionLogin:
 			log.Info("Start login..")
 			m.authInProgress = true

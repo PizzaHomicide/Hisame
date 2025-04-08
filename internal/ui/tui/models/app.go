@@ -182,7 +182,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *AppModel) handleKeyMsg(msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch kb.GetActionByKey(msg.String(), kb.GlobalBindings) {
+		switch kb.GetActionByKey(msg, kb.ContextGlobal) {
 		case kb.ActionQuit:
 			log.Info("Quit command received. Shutting down...")
 			return tea.Quit

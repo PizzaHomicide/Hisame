@@ -104,7 +104,7 @@ func (m *AnimeListModel) handleSearchModeKeyMsg(msg tea.KeyMsg) tea.Cmd {
 	if !m.searchMode {
 		return nil
 	}
-	switch kb.GetActionByKey(msg.String(), kb.SearchModeBindings) {
+	switch kb.GetActionByKey(msg, kb.ContextSearchMode) {
 	case kb.ActionBack:
 		// Cancels search, clearing the filter
 		m.searchMode = false
@@ -132,7 +132,7 @@ func (m *AnimeListModel) handleSearchModeKeyMsg(msg tea.KeyMsg) tea.Cmd {
 
 // handleKeyPress processes keyboard inputs in normal mode
 func (m *AnimeListModel) handleKeyPress(msg tea.KeyMsg) tea.Cmd {
-	switch action := kb.GetActionByKey(msg.String(), kb.AnimeListBindings); action {
+	switch action := kb.GetActionByKey(msg, kb.ContextAnimeList); action {
 	case kb.ActionMoveUp:
 		if m.cursor > 0 {
 			m.cursor--
