@@ -129,13 +129,6 @@ var AnimeListBindings = []Binding{
 		},
 	},
 	{
-		Action: ActionSelectEpisode,
-		KeyMap: KeyMap{
-			Primary: "enter",
-			Help:    "View anime details",
-		},
-	},
-	{
 		Action: ActionRefreshAnimeList,
 		KeyMap: KeyMap{
 			Primary: "r",
@@ -145,8 +138,9 @@ var AnimeListBindings = []Binding{
 	{
 		Action: ActionPlayNextEpisode,
 		KeyMap: KeyMap{
-			Primary: "p",
-			Help:    "Play next episode",
+			Primary:   "enter",
+			Secondary: "p",
+			Help:      "Play next episode",
 		},
 	},
 	{
