@@ -15,24 +15,24 @@ const (
 	ActionLogin Action = "login"
 
 	// Anime list actions
-	ActionMoveUp                Action = "move_up"
-	ActionMoveDown              Action = "move_down"
-	ActionPageUp                Action = "page_up"
-	ActionPageDown              Action = "page_down"
-	ActionSelectEpisode         Action = "select_episode"
-	ActionRefreshAnimeList      Action = "refresh_anime_list"
-	ActionPlayNextEpisode       Action = "play_next_episode"
-	ActionOpenEpisodeSelector   Action = "episode_selector"
-	ActionIncrementProgress     Action = "increment_progress"
-	ActionDecrementProgress     Action = "decrement_progress"
-	ActionToggleStatusCurrent   Action = "toggle_status_current"
-	ActionToggleStatusPlanning  Action = "toggle_status_planning"
-	ActionToggleStatusComplete  Action = "toggle_status_complete"
-	ActionToggleStatusDropped   Action = "toggle_status_dropped"
-	ActionToggleStatusPaused    Action = "toggle_status_paused"
-	ActionToggleStatusRepeating Action = "toggle_status_repeating"
-	ActionToggleNewEpisodes     Action = "toggle_new_episodes"
-	ActionToggleFinishedAiring  Action = "toggle_finished_airing"
+	ActionMoveUp                      Action = "move_up"
+	ActionMoveDown                    Action = "move_down"
+	ActionPageUp                      Action = "page_up"
+	ActionPageDown                    Action = "page_down"
+	ActionSelectEpisode               Action = "select_episode"
+	ActionRefreshAnimeList            Action = "refresh_anime_list"
+	ActionPlayNextEpisode             Action = "play_next_episode"
+	ActionOpenEpisodeSelector         Action = "episode_selector"
+	ActionIncrementProgress           Action = "increment_progress"
+	ActionDecrementProgress           Action = "decrement_progress"
+	ActionToggleFilterStatusCurrent   Action = "toggle_filter_status_current"
+	ActionToggleFilterStatusPlanning  Action = "toggle_filter_status_planning"
+	ActionToggleFilterStatusComplete  Action = "toggle_filter_status_complete"
+	ActionToggleFilterStatusDropped   Action = "toggle_filter_status_dropped"
+	ActionToggleFilterStatusPaused    Action = "toggle_filter_status_paused"
+	ActionToggleFilterStatusRepeating Action = "toggle_filter_status_repeating"
+	ActionToggleFilterNewEpisodes     Action = "toggle_filter_new_episodes"
+	ActionToggleFilterFinishedAiring  Action = "toggle_filter_finished_airing"
 
 	// Search mode actions
 	ActionEnableSearch   Action = "enable_search"
@@ -180,56 +180,56 @@ var AnimeListBindings = []Binding{
 	},
 	// Filters
 	{
-		Action: ActionToggleStatusCurrent,
+		Action: ActionToggleFilterStatusCurrent,
 		KeyMap: KeyMap{
 			Primary: "1",
 			Help:    "Toggle watching filter",
 		},
 	},
 	{
-		Action: ActionToggleStatusPlanning,
+		Action: ActionToggleFilterStatusPlanning,
 		KeyMap: KeyMap{
 			Primary: "2",
 			Help:    "Toggle planning filter",
 		},
 	},
 	{
-		Action: ActionToggleStatusComplete,
+		Action: ActionToggleFilterStatusComplete,
 		KeyMap: KeyMap{
 			Primary: "3",
 			Help:    "Toggle completed filter",
 		},
 	},
 	{
-		Action: ActionToggleStatusDropped,
+		Action: ActionToggleFilterStatusDropped,
 		KeyMap: KeyMap{
 			Primary: "4",
 			Help:    "Toggle dropped filter",
 		},
 	},
 	{
-		Action: ActionToggleStatusPaused,
+		Action: ActionToggleFilterStatusPaused,
 		KeyMap: KeyMap{
 			Primary: "5",
 			Help:    "Toggle on-hold filter",
 		},
 	},
 	{
-		Action: ActionToggleStatusRepeating,
+		Action: ActionToggleFilterStatusRepeating,
 		KeyMap: KeyMap{
 			Primary: "6",
 			Help:    "Toggle repeating filter",
 		},
 	},
 	{
-		Action: ActionToggleNewEpisodes,
+		Action: ActionToggleFilterNewEpisodes,
 		KeyMap: KeyMap{
 			Primary: "a",
 			Help:    "Toggle available episodes filter",
 		},
 	},
 	{
-		Action: ActionToggleFinishedAiring,
+		Action: ActionToggleFilterFinishedAiring,
 		KeyMap: KeyMap{
 			Primary: "f",
 			Help:    "Toggle finished airing filter",

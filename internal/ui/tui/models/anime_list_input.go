@@ -26,7 +26,9 @@ func (m *AnimeListModel) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 
 		// Normal mode key handling
-		return m.handleKeyPress(msg)
+		if cmd := m.handleKeyPress(msg); cmd != nil {
+			return m, cmd
+		}
 
 	case spinner.TickMsg:
 		if m.loading {
@@ -129,66 +131,59 @@ func (m *AnimeListModel) handleSearchModeKeyMsg(msg tea.KeyMsg) tea.Cmd {
 }
 
 // handleKeyPress processes keyboard inputs in normal mode
-func (m *AnimeListModel) handleKeyPress(msg tea.KeyMsg) (Model, tea.Cmd) {
-	switch msg.String() {
-	case "up", "k":
+func (m *AnimeListModel) handleKeyPress(msg tea.KeyMsg) tea.Cmd {
+	switch action := kb.GetActionByKey(msg.String(), kb.AnimeListBindings); action {
+	case kb.ActionMoveUp:
 		if m.cursor > 0 {
 			m.cursor--
 		}
-	case "down", "j":
+		return Handled("cursor_move:up")
+	case kb.ActionMoveDown:
 		if len(m.filteredAnime) > 0 && m.cursor < len(m.filteredAnime)-1 {
 			m.cursor++
 		}
-	case "1", "2", "3", "4", "5", "6":
-		// Toggle status filters based on number keys
-		m.toggleStatusFilter(msg.String())
+		return Handled("cursor_move:down")
+	// All filter toggle actions are handled together
+	case kb.ActionToggleFilterStatusCurrent, kb.ActionToggleFilterStatusPlanning, kb.ActionToggleFilterStatusComplete,
+		kb.ActionToggleFilterStatusDropped, kb.ActionToggleFilterStatusPaused, kb.ActionToggleFilterStatusRepeating,
+		kb.ActionToggleFilterFinishedAiring, kb.ActionToggleFilterNewEpisodes:
+		m.toggleFilter(action)
 		m.applyFilters()
 		m.cursor = 0
-	case "a":
-		m.toggleHasNewEpisodesFilter()
-		m.applyFilters()
-		m.cursor = 0
-	case "f":
-		m.toggleIsFinishedAiringFilter()
-		m.applyFilters()
-		m.cursor = 0
-	case "ctrl+f":
+		return Handled("filter:toggle")
+	case kb.ActionEnableSearch:
 		m.searchMode = true
 		m.searchInput.Focus()
-		return m, nil
-	case "enter":
-		// TODO: Implement view detail of selected anime
-		log.Info("View anime detail", "title", m.getSelectedAnime().Title.Preferred, "id", m.getSelectedAnime().ID)
-	case "p":
+		return Handled("search:enable")
+	case kb.ActionPlayNextEpisode:
 		return m.handlePlayEpisode()
-	case "ctrl+p":
+	case kb.ActionOpenEpisodeSelector:
 		return m.handleChooseEpisode()
-	case "r":
-		// Refresh anime list
-		return m, func() tea.Msg {
+	case kb.ActionRefreshAnimeList:
+		return func() tea.Msg {
 			return LoadingMsg{
 				Type:      LoadingStart,
 				Message:   "Refreshing anime list...",
 				Operation: m.fetchAnimeListCmd(),
 			}
 		}
-	case "+":
+	case kb.ActionIncrementProgress:
 		return m.handleIncrementProgress()
-	case "-":
+	case kb.ActionDecrementProgress:
 		return m.handleDecrementProgress()
 	}
 
-	return m, nil
+	return nil
 }
 
 // handleIncrementProgress handles incrementing the progress of the selected anime
-func (m *AnimeListModel) handleIncrementProgress() (Model, tea.Cmd) {
+func (m *AnimeListModel) handleIncrementProgress() tea.Cmd {
 	anime := m.getSelectedAnime()
 	if anime == nil {
-		return m, nil
+		return Handled("increment_progress:none_selected")
 	}
 
-	return m, func() tea.Msg {
+	return func() tea.Msg {
 		log.Info("Incrementing progress",
 			"title", anime.Title.Preferred,
 			"id", anime.ID,
@@ -219,13 +214,13 @@ func (m *AnimeListModel) handleIncrementProgress() (Model, tea.Cmd) {
 }
 
 // handleDecrementProgress handles decrementing the progress of the selected anime
-func (m *AnimeListModel) handleDecrementProgress() (Model, tea.Cmd) {
+func (m *AnimeListModel) handleDecrementProgress() tea.Cmd {
 	anime := m.getSelectedAnime()
 	if anime == nil {
-		return m, nil
+		return Handled("decrement_progress:none_selected")
 	}
 
-	return m, func() tea.Msg {
+	return func() tea.Msg {
 		log.Info("Decrementing progress",
 			"title", anime.Title.Preferred,
 			"id", anime.ID,
@@ -256,13 +251,13 @@ func (m *AnimeListModel) handleDecrementProgress() (Model, tea.Cmd) {
 }
 
 // handlePlayEpisode initiates playback of the next episode
-func (m *AnimeListModel) handlePlayEpisode() (Model, tea.Cmd) {
+func (m *AnimeListModel) handlePlayEpisode() tea.Cmd {
 	// Only attempt playback if there are unwatched episodes available
 	anime := m.getSelectedAnime()
 	if !anime.HasUnwatchedEpisodes() {
 		log.Info("No unwatched episodes available", "title", anime.Title.Preferred,
 			"id", anime.ID, "progress", anime.UserData.Progress, "latest_aired", anime.GetLatestAiredEpisode())
-		return m, nil
+		return Handled("play_episode:none_available")
 	}
 	nextEpNumber := m.getSelectedAnime().UserData.Progress + 1
 	log.Info("Play next episode",
@@ -277,14 +272,14 @@ func (m *AnimeListModel) handlePlayEpisode() (Model, tea.Cmd) {
 		nextEpNumber,
 		m.getSelectedAnime().Title.Preferred)
 
-	return m, tea.Batch(
+	return tea.Batch(
 		m.spinner.Tick,
 		m.loadNextEpisode(nextEpNumber),
 	)
 }
 
 // handleChooseEpisode initiates the episode selection flow
-func (m *AnimeListModel) handleChooseEpisode() (Model, tea.Cmd) {
+func (m *AnimeListModel) handleChooseEpisode() tea.Cmd {
 	log.Info("Choose episode to play",
 		"title", m.getSelectedAnime().Title.Preferred,
 		"id", m.getSelectedAnime().ID)
@@ -293,7 +288,7 @@ func (m *AnimeListModel) handleChooseEpisode() (Model, tea.Cmd) {
 	m.loadingMsg = fmt.Sprintf("Finding episodes for %s...",
 		m.getSelectedAnime().Title.Preferred)
 
-	return m, tea.Batch(
+	return tea.Batch(
 		m.spinner.Tick,
 		m.loadEpisodes(),
 	)

@@ -6,6 +6,7 @@ package models
 
 import (
 	"fmt"
+	kb "github.com/PizzaHomicide/hisame/internal/ui/tui/keybindings"
 	"strings"
 
 	"github.com/PizzaHomicide/hisame/internal/domain"
@@ -13,23 +14,29 @@ import (
 	"github.com/PizzaHomicide/hisame/internal/ui/tui/styles"
 )
 
-// toggleStatusFilter toggles a status filter based on the key pressed
-func (m *AnimeListModel) toggleStatusFilter(key string) {
+// toggleFilter toggles a filter based on the action
+func (m *AnimeListModel) toggleFilter(action kb.Action) {
 	var status domain.MediaStatus
 
-	switch key {
-	case "1":
+	switch action {
+	case kb.ActionToggleFilterStatusCurrent:
 		status = domain.StatusCurrent
-	case "2":
+	case kb.ActionToggleFilterStatusPlanning:
 		status = domain.StatusPlanning
-	case "3":
+	case kb.ActionToggleFilterStatusComplete:
 		status = domain.StatusCompleted
-	case "4":
+	case kb.ActionToggleFilterStatusDropped:
 		status = domain.StatusDropped
-	case "5":
+	case kb.ActionToggleFilterStatusPaused:
 		status = domain.StatusPaused
-	case "6":
+	case kb.ActionToggleFilterStatusRepeating:
 		status = domain.StatusRepeating
+	case kb.ActionToggleFilterFinishedAiring:
+		m.filters.isFinishedAiring = !m.filters.isFinishedAiring
+		return
+	case kb.ActionToggleFilterNewEpisodes:
+		m.filters.hasAvailableEpisodes = !m.filters.hasAvailableEpisodes
+		return
 	default:
 		return
 	}
@@ -55,16 +62,6 @@ func (m *AnimeListModel) toggleStatusFilter(key string) {
 		// Status not in filters, add it
 		m.filters.statusFilters = append(m.filters.statusFilters, status)
 	}
-}
-
-// toggleHasNewEpisodesFilter toggles the new episodes filter
-func (m *AnimeListModel) toggleHasNewEpisodesFilter() {
-	m.filters.hasAvailableEpisodes = !m.filters.hasAvailableEpisodes
-}
-
-// toggleIsFinishedAiringFilter toggles the completed airing filter
-func (m *AnimeListModel) toggleIsFinishedAiringFilter() {
-	m.filters.isFinishedAiring = !m.filters.isFinishedAiring
 }
 
 // applyFilters applies the current filters to the anime list
