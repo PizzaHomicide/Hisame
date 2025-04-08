@@ -80,8 +80,6 @@ func (m *EpisodeSelectModel) Init() tea.Cmd {
 
 // Update updates the model based on messages
 func (m *EpisodeSelectModel) Update(msg tea.Msg) (Model, tea.Cmd) {
-	var cmd tea.Cmd
-
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		// If in search mode, handle input differently
@@ -94,7 +92,7 @@ func (m *EpisodeSelectModel) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 	}
 
-	return m, cmd
+	return m, nil
 }
 
 func (m *EpisodeSelectModel) handleKeyMsg(msg tea.Msg) tea.Cmd {
@@ -166,12 +164,10 @@ func (m *EpisodeSelectModel) handleSearchModeKeyMsg(msg tea.Msg) tea.Cmd {
 			m.searchMode = false
 			m.searchInput.SetValue("")
 			m.applyFilter()
-			//m.ensureCursorVisible()
 			return Handled("search:exit")
 		case kb.ActionSearchComplete:
 			m.searchMode = false
 			m.applyFilter()
-			//m.ensureCursorVisible()
 			return Handled("search:apply")
 		}
 
@@ -181,7 +177,6 @@ func (m *EpisodeSelectModel) handleSearchModeKeyMsg(msg tea.Msg) tea.Cmd {
 
 		// Apply filters as we type
 		m.applyFilter()
-		m.ensureCursorVisible()
 
 		return cmd
 	}
