@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Help screen is now scrollable, supporting up/down, pgup/pgdown and home/end, as well as mouse wheel scrolling
 
 ### Changed
 - Made keybind handling more consistent across the application with a central place to define them all.
@@ -16,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - On the anime list view & episode search view, '/' can be used to enter search mode.  ctrl+f still works.
   - When in search mode, 'esc' now consistently exists search mode and cancels the search you had.  ctrl+f also does this
   - When in search mode 'enter' now consistently applies the current search and moves focus back to the list.
+- Help screen content updated
 
 ### Fixed
 - Initialisation error which never removed the initial loading model from the display stack.  This meant you could press 'esc' on the auth or list view and fall back to a loading screen where you couldn't take any action.
