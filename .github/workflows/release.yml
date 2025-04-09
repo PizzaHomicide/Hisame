@@ -32,6 +32,22 @@ jobs:
           git tag -a v${{ github.event.inputs.version }} -m "Release v${{ github.event.inputs.version }}"
           git push origin v${{ github.event.inputs.version }}
 
+      - name: Build release body
+        id: release_body
+        run: |
+          VERSION="v${{ github.event.inputs.version }}"
+          RAW_CHANGELOG=$(awk "/## \\[${VERSION#v}\\]/,/^## \\[/" CHANGELOG.md | sed '$d')
+          
+          # Read template and inject version + changelog
+          TEMPLATE=$(cat .github/release_template.md)
+          FINAL_BODY=$(echo "$TEMPLATE" | sed "s/{{VERSION}}/${VERSION}/g")
+          FINAL_BODY=$(echo "$FINAL_BODY" | sed "/{{CHANGELOG}}/{
+            r /dev/stdin
+            d
+          }" <<< "$RAW_CHANGELOG")
+
+          echo "$FINAL_BODY" > RELEASE_BODY.md
+
       - name: Create Release
         id: create_release
         uses: softprops/action-gh-release@v1
@@ -40,19 +56,7 @@ jobs:
           name: Hisame v${{ github.event.inputs.version }}-alpha
           draft: false
           prerelease: ${{ github.event.inputs.prerelease }}
-          body: |
-            Hisame (氷雨) Alpha Release v${{ github.event.inputs.version }}
-            
-            This is an alpha release of Hisame, a TUI tool for managing your AniList.
-            
-            ## Installation
-            Download the appropriate binary for your platform and run it from a terminal.
-            
-            ## Known Issues
-            - See the TODO section in the README.md file for known issues and upcoming features.
-            
-            ## Feedback
-            Please report any issues in the GitHub issue tracker.
+          body_path: RELEASE_BODY.md
 
   build:
     needs: create-release
