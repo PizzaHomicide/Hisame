@@ -1,4 +1,4 @@
-Hisame (氷雨) Alpha Release v{{VERSION}}
+Hisame (氷雨) Alpha Release {{VERSION}}
 
 This is an alpha release of Hisame, a TUI tool for managing your AniList.
 
