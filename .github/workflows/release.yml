@@ -35,18 +35,15 @@ jobs:
       - name: Build release body
         id: release_body
         run: |
-          VERSION="v${{ github.event.inputs.version }}"
-          RAW_CHANGELOG=$(awk "/## \\[${VERSION#v}\\]/,/^## \\[/" CHANGELOG.md | sed '$d')
-          
-          # Read template and inject version + changelog
-          TEMPLATE=$(cat .github/release_template.md)
-          FINAL_BODY=$(echo "$TEMPLATE" | sed "s/{{VERSION}}/${VERSION}/g")
-          FINAL_BODY=$(echo "$FINAL_BODY" | sed "/{{CHANGELOG}}/{
-            r /dev/stdin
-            d
-          }" <<< "$RAW_CHANGELOG")
+          chmod +x .github/scripts/prepare-release-body.sh
+          .github/scripts/prepare-release-body.sh \
+            v${{ github.event.inputs.version }} \
+            .github/templates/release.md \
+            CHANGELOG.md \
+            RELEASE_BODY.md
 
-          echo "$FINAL_BODY" > RELEASE_BODY.md
+      - name: Output Release Body
+        run: cat RELEASE_BODY.md
 
       - name: Create Release
         id: create_release
