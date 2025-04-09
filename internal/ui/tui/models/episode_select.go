@@ -30,39 +30,34 @@ type EpisodeSelectModel struct {
 }
 
 // NewEpisodeSelectModel creates a new episode selection modal
-func NewEpisodeSelectModel() *EpisodeSelectModel {
+func NewEpisodeSelectModel(episodes []player.AllAnimeEpisodeInfo, animeTitle string) *EpisodeSelectModel {
 	input := textinput.New()
 	input.Placeholder = "Filter episodes..."
 	input.Width = 30
+	input.SetValue("")
+
+	hasMultiCours := false
+	for _, ep := range episodes {
+		if fmt.Sprintf("%d", ep.OverallEpisodeNumber) != ep.AllAnimeEpisodeNumber {
+			hasMultiCours = true
+			break
+		}
+	}
 
 	return &EpisodeSelectModel{
-		searchInput: input,
-		searchMode:  false,
-		cursor:      0,
+		searchInput:    input,
+		searchMode:     false,
+		cursor:         0,
+		episodes:       episodes,
+		filtered:       episodes,
+		animeTitle:     animeTitle,
+		viewportOffset: 0,
+		hasMultiCours:  hasMultiCours,
 	}
 }
 
 func (m *EpisodeSelectModel) ViewType() View {
 	return ViewEpisodeSelect
-}
-
-// SetEpisodes sets the episodes to display
-func (m *EpisodeSelectModel) SetEpisodes(episodes []player.AllAnimeEpisodeInfo, animeTitle string) {
-	m.episodes = episodes
-	m.filtered = episodes
-	m.animeTitle = animeTitle
-	m.cursor = 0
-	m.viewportOffset = 0
-	m.searchInput.SetValue("")
-
-	// Determine if we have multiple cours by checking if any show has different AllAnimeEpisodeNumber from OverallEpisodeNumber
-	m.hasMultiCours = false
-	for _, ep := range episodes {
-		if fmt.Sprintf("%d", ep.OverallEpisodeNumber) != ep.AllAnimeEpisodeNumber {
-			m.hasMultiCours = true
-			break
-		}
-	}
 }
 
 // GetSelectedEpisode returns the currently selected episode

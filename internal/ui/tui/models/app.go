@@ -18,21 +18,11 @@ type AppModel struct {
 	modelStack    []Model // UI model stack.  The top model is rendered and handles non-global/orchestration messages
 	width, height int
 
-	// Models used for various views
-	authModel          *AuthModel
-	animeListModel     *AnimeListModel
-	helpModel          *HelpModel
-	episodeSelectModel *EpisodeSelectModel
-
 	// Services used for fetching and updating state
 	animeService *service.AnimeService
 }
 
 func NewAppModel(cfg *config.Config) AppModel {
-	// Create models
-	authModel := NewAuthModel()
-	episodeSelectModel := NewEpisodeSelectModel()
-
 	// Create an initial loading model for startup
 	initialLoadingModel := NewLoadingModel("Starting Hisame...").
 		WithTitle("Initialising")
@@ -41,10 +31,8 @@ func NewAppModel(cfg *config.Config) AppModel {
 	modelStack := []Model{initialLoadingModel}
 
 	app := AppModel{
-		config:             cfg,
-		modelStack:         modelStack,
-		authModel:          authModel,
-		episodeSelectModel: episodeSelectModel,
+		config:     cfg,
+		modelStack: modelStack,
 	}
 
 	return app
@@ -234,8 +222,8 @@ func (m *AppModel) handleOrchestrationMsg(msg tea.Msg) tea.Cmd {
 			}
 
 			// Go to auth screen
-			m.SetStack([]Model{m.authModel})
-			return m.authModel.Init()
+			m.SetStack([]Model{NewAuthModel()})
+			return m.CurrentModel().Init()
 		}
 
 		// Valid token - set up services and go to anime list
@@ -245,10 +233,10 @@ func (m *AppModel) handleOrchestrationMsg(msg tea.Msg) tea.Cmd {
 
 		// Save references
 		m.animeService = animeService
-		m.animeListModel = animeListModel
+		//m.animeListModel = animeListModel
 
 		// Push anime list model
-		m.SetStack([]Model{m.animeListModel})
+		m.SetStack([]Model{NewAnimeListModel(m.config, m.animeService)})
 
 		// Now start loading the anime list data
 		return func() tea.Msg {
@@ -265,9 +253,9 @@ func (m *AppModel) handleOrchestrationMsg(msg tea.Msg) tea.Cmd {
 		} else {
 			log.Error("Authentication failed", "error", msg.Error)
 			// Reset auth model in case it's in a bad state
-			m.authModel = NewAuthModel()
-			m.SetStack([]Model{m.authModel})
-			return tea.Quit
+			//m.authModel = NewAuthModel()
+			m.SetStack([]Model{NewAuthModel()})
+			return m.CurrentModel().Init()
 		}
 
 	case EpisodeMsg:
@@ -275,15 +263,13 @@ func (m *AppModel) handleOrchestrationMsg(msg tea.Msg) tea.Cmd {
 		case EpisodeEventLoaded:
 			if len(msg.Episodes) == 0 {
 				log.Warn("No episodes found for anime", "title", msg.Title)
-				// Turn off loading in anime list model
-				m.animeListModel.DisableLoading()
+				m.disableLoading()
 				return nil
 			}
 
 			log.Info("Episodes loaded", "count", len(msg.Episodes), "title", msg.Title)
-			m.episodeSelectModel.SetEpisodes(msg.Episodes, msg.Title)
-			m.PushModel(m.episodeSelectModel)
-			m.animeListModel.DisableLoading()
+			m.PushModel(NewEpisodeSelectModel(msg.Episodes, msg.Title))
+			m.disableLoading()
 			return nil
 
 		case EpisodeEventSelected:
@@ -297,13 +283,15 @@ func (m *AppModel) handleOrchestrationMsg(msg tea.Msg) tea.Cmd {
 				m.PopModel()
 
 				// Delegate to anime list model to handle starting playback
-				_, cmd := m.animeListModel.Update(msg)
-				return cmd
+				// TODO:  This assumption feels fragile.  Might break in the future.  This flow needs to be improved in general to better use messages.
+				// As an idea, maybe we should traverse the stack top to bottom for 'orchestration' type messages looking for a model that can handle it,
+				// so we're not dependent on a specific model stack state.
+				return m.updateCurrentModel(msg)
 			}
 
 		case EpisodeEventError:
 			log.Warn("Could not find episode", "error", msg.Error)
-			m.animeListModel.DisableLoading()
+			m.disableLoading()
 			return nil
 		}
 
@@ -312,7 +300,7 @@ func (m *AppModel) handleOrchestrationMsg(msg tea.Msg) tea.Cmd {
 		switch msg.Type {
 		case PlaybackEventStarted, PlaybackEventEnded, PlaybackEventError:
 			// Make sure any loading indicators are disabled in the anime list
-			m.animeListModel.DisableLoading()
+			m.disableLoading()
 			return nil
 		}
 
@@ -324,12 +312,15 @@ func (m *AppModel) handleOrchestrationMsg(msg tea.Msg) tea.Cmd {
 		}
 
 		// Then forward the result to the AnimeListModel
+		// TODO:  Bad pattern.  Should just delegate messages.
 		if msg.Success {
-			_, cmd := m.animeListModel.HandleAnimeListLoaded(msg.AnimeList)
-			return cmd
+			return m.withAnimeListModel(func(model *AnimeListModel) (Model, tea.Cmd) {
+				return model.HandleAnimeListLoaded(msg.AnimeList)
+			})
 		} else {
-			_, cmd := m.animeListModel.HandleAnimeListError(msg.Error)
-			return cmd
+			return m.withAnimeListModel(func(model *AnimeListModel) (Model, tea.Cmd) {
+				return model.HandleAnimeListError(msg.Error)
+			})
 		}
 
 	case LoadingMsg:
@@ -394,8 +385,7 @@ func (m *AppModel) handleLogout() tea.Cmd {
 	}
 
 	// Reset auth model and make it the only model in stack
-	m.authModel = NewAuthModel()
-	m.SetStack([]Model{m.authModel})
+	m.SetStack([]Model{NewAuthModel()})
 
 	return nil
 }
@@ -439,13 +429,13 @@ func (m *AppModel) handleSuccessfulAuth(token string) tea.Cmd {
 	// Set up the anime service and models
 	animeRepo := anilist.NewAnimeRepository(client)
 	m.animeService = service.NewAnimeService(animeRepo)
-	m.animeListModel = NewAnimeListModel(m.config, m.animeService)
+	//m.animeListModel = NewAnimeListModel(m.config, m.animeService)
 
 	// Replace the entire stack with just the anime list model
-	m.SetStack([]Model{m.animeListModel})
+	m.SetStack([]Model{NewAnimeListModel(m.config, m.animeService)})
 
 	// Initialize the anime list model
-	return m.animeListModel.Init()
+	return m.CurrentModel().Init()
 }
 
 func (m AppModel) View() string {
@@ -494,4 +484,55 @@ func (m AppModel) validateTokenCmd() tea.Cmd {
 			Client: client,
 		}
 	}
+}
+
+// getModel returns the model for the matching view.  If there are more than one model for the same view in the
+// stack, the first (top-most) model will be returned.
+func (m *AppModel) getModel(view View) Model {
+	// Search from top to bottom of the stack
+	for i := len(m.modelStack) - 1; i >= 0; i-- {
+		if m.modelStack[i].ViewType() == view {
+			return m.modelStack[i]
+		}
+	}
+
+	// No matching model found
+	return nil
+}
+
+// disableLoading is a temporary helper function to disable the loading screen on the animeListModel
+// It is temporary because this model is to be changed to not have its own baked in loading logic.
+func (m *AppModel) disableLoading() {
+	// Turn off loading in anime list model
+	if model := m.getModel(ViewAnimeList); model != nil {
+		if animeListModel, ok := model.(*AnimeListModel); ok {
+			animeListModel.DisableLoading()
+		}
+	}
+}
+
+// updateCurrentModel sends the input message to the top model on the stack and returns any cmd from it
+func (m *AppModel) updateCurrentModel(msg tea.Msg) tea.Cmd {
+	if currentModel := m.CurrentModel(); currentModel != nil {
+		updatedModel, cmd := currentModel.Update(msg)
+		if updatedModel != nil {
+			m.modelStack[len(m.modelStack)-1] = updatedModel
+		}
+		return cmd
+	}
+	return nil
+}
+
+// withAnimeListModel is a helper to find the anime list model in the stack and execute a function on it
+func (m *AppModel) withAnimeListModel(fn func(*AnimeListModel) (Model, tea.Cmd)) tea.Cmd {
+	if model := m.getModel(ViewAnimeList); model != nil {
+		if animeListModel, ok := model.(*AnimeListModel); ok {
+			_, cmd := fn(animeListModel)
+			return cmd
+		}
+	}
+
+	// No model found or wrong type
+	log.Warn("AnimeListModel not found or wrong type")
+	return nil
 }
