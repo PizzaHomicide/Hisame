@@ -7,7 +7,7 @@ import (
 
 func TestNoDuplicateKeyBindings(t *testing.T) {
 	// Check each context individually
-	for contextName, bindings := range contextBindings {
+	for contextName, bindings := range ContextBindings {
 		t.Run(fmt.Sprintf("Context_%s", contextName), func(t *testing.T) {
 			keyToAction := make(map[string]Action)
 

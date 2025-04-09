@@ -31,7 +31,6 @@ type AppModel struct {
 func NewAppModel(cfg *config.Config) AppModel {
 	// Create models
 	authModel := NewAuthModel()
-	helpModel := NewHelpModel()
 	episodeSelectModel := NewEpisodeSelectModel()
 
 	// Create an initial loading model for startup
@@ -45,7 +44,6 @@ func NewAppModel(cfg *config.Config) AppModel {
 		config:             cfg,
 		modelStack:         modelStack,
 		authModel:          authModel,
-		helpModel:          helpModel,
 		episodeSelectModel: episodeSelectModel,
 	}
 
@@ -77,7 +75,7 @@ func (m *AppModel) PopModel() {
 	}
 
 	m.modelStack = m.modelStack[:len(m.modelStack)-1]
-	log.Debug("Popped model from stack", "new_top", fmt.Sprintf("%T", m.CurrentModel()), "stack_size", len(m.modelStack))
+	log.Debug("Popped model from stack", "new_top", m.CurrentModel().ViewType(), "stack_size", len(m.modelStack))
 }
 
 // SetStack completely replaces the model stack
@@ -96,7 +94,7 @@ func (m *AppModel) SetStack(models []Model) {
 		}
 	}
 
-	log.Debug("Set new model stack", "top_model", fmt.Sprintf("%T", m.CurrentModel()), "stack_size", len(m.modelStack))
+	log.Debug("Set new model stack", "top_model", m.CurrentModel().ViewType(), "stack_size", len(m.modelStack))
 }
 
 func (m AppModel) Init() tea.Cmd {
@@ -408,15 +406,12 @@ func (m *AppModel) handleToggleHelp() tea.Cmd {
 		// Help is already active, pop it
 		m.PopModel()
 	} else {
-		// Get context from current model
-		context := ViewAnimeList // Default fallback
-		if currentModel := m.CurrentModel(); currentModel != nil {
-			context = currentModel.ViewType()
+		if currentModel := m.CurrentModel(); currentModel == nil {
+			log.Error("Model stack is empty when trying to launch help screen.  This should never happen.  Hisame will exit")
+			return tea.Quit
 		}
 
-		// Set context and push help model
-		m.helpModel.SetContext(context)
-		m.PushModel(m.helpModel)
+		m.PushModel(NewHelpModel(m.CurrentModel().ViewType()))
 	}
 	return nil
 }

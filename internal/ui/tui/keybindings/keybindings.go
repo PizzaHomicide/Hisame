@@ -13,14 +13,18 @@ const (
 	ActionLogout     Action = "logout"
 	ActionBack       Action = "back" // General purpose "go back" or "cancel"
 
+	// Navigation actions
+	ActionMoveUp     Action = "move_up"
+	ActionMoveDown   Action = "move_down"
+	ActionPageUp     Action = "page_up"
+	ActionPageDown   Action = "page_down"
+	ActionMoveTop    Action = "move_top"
+	ActionMoveBottom Action = "move_bottom"
+
 	// Auth view actions
 	ActionLogin Action = "login"
 
 	// Anime list actions
-	ActionMoveUp                      Action = "move_up"
-	ActionMoveDown                    Action = "move_down"
-	ActionPageUp                      Action = "page_up"
-	ActionPageDown                    Action = "page_down"
 	ActionSelectEpisode               Action = "select_episode"
 	ActionRefreshAnimeList            Action = "refresh_anime_list"
 	ActionPlayNextEpisode             Action = "play_next_episode"
@@ -50,14 +54,16 @@ const (
 	ContextAnimeList        ContextName = "anime_list"
 	ContextEpisodeSelection ContextName = "episode_selection"
 	ContextSearchMode       ContextName = "search_mode"
+	ContextHelp             ContextName = "help"
 )
 
-var contextBindings = map[ContextName][]Binding{
+var ContextBindings = map[ContextName][]Binding{
 	ContextGlobal:           globalBindings,
 	ContextAuth:             authBindings,
 	ContextAnimeList:        animeListBindings,
 	ContextEpisodeSelection: episodeSelectBindings,
 	ContextSearchMode:       searchModeBindings,
+	ContextHelp:             helpBindings,
 }
 
 // KeyMap stores the mappings from actions to key sequences for each context
@@ -71,6 +77,54 @@ type KeyMap struct {
 type Binding struct {
 	Action Action
 	KeyMap KeyMap
+}
+
+// navigationBindings contains general navigation bindings for consistent navigation across the app
+var navigationBindings = []Binding{
+	{
+		Action: ActionMoveUp,
+		KeyMap: KeyMap{
+			Primary:   "up",
+			Secondary: "k",
+			Help:      "Move cursor up",
+		},
+	},
+	{
+		Action: ActionMoveDown,
+		KeyMap: KeyMap{
+			Primary:   "down",
+			Secondary: "j",
+			Help:      "Move cursor down",
+		},
+	},
+	{
+		Action: ActionPageUp,
+		KeyMap: KeyMap{
+			Primary: "pgup",
+			Help:    "Move up one page",
+		},
+	},
+	{
+		Action: ActionPageDown,
+		KeyMap: KeyMap{
+			Primary: "pgdown",
+			Help:    "Move down one page",
+		},
+	},
+	{
+		Action: ActionMoveTop,
+		KeyMap: KeyMap{
+			Primary: "home",
+			Help:    "Move top of view",
+		},
+	},
+	{
+		Action: ActionMoveBottom,
+		KeyMap: KeyMap{
+			Primary: "end",
+			Help:    "Move bottom of view",
+		},
+	},
 }
 
 // globalBindings contains key bindings that work across all views
@@ -117,38 +171,12 @@ var authBindings = []Binding{
 	},
 }
 
+// helpBindings contains key bindings specific to the help view
+var helpBindings = withNavigation([]Binding{})
+
 // animeListBindings contains key bindings specific to the anime list view
-var animeListBindings = []Binding{
-	{
-		Action: ActionMoveUp,
-		KeyMap: KeyMap{
-			Primary:   "up",
-			Secondary: "k",
-			Help:      "Move cursor up",
-		},
-	},
-	{
-		Action: ActionMoveDown,
-		KeyMap: KeyMap{
-			Primary:   "down",
-			Secondary: "j",
-			Help:      "Move cursor down",
-		},
-	},
-	{
-		Action: ActionPageUp,
-		KeyMap: KeyMap{
-			Primary: "pgup",
-			Help:    "Move up one page",
-		},
-	},
-	{
-		Action: ActionPageDown,
-		KeyMap: KeyMap{
-			Primary: "pgdown",
-			Help:    "Move down one page",
-		},
-	},
+var animeListBindings = withNavigation([]Binding{
+
 	{
 		Action: ActionRefreshAnimeList,
 		KeyMap: KeyMap{
@@ -250,40 +278,10 @@ var animeListBindings = []Binding{
 			Help:    "Toggle finished airing filter",
 		},
 	},
-}
+})
 
 // episodeSelectBindings contains key bindings specific to the episode selection view
-var episodeSelectBindings = []Binding{
-	{
-		Action: ActionMoveUp,
-		KeyMap: KeyMap{
-			Primary:   "up",
-			Secondary: "k",
-			Help:      "Move cursor up",
-		},
-	},
-	{
-		Action: ActionMoveDown,
-		KeyMap: KeyMap{
-			Primary:   "down",
-			Secondary: "j",
-			Help:      "Move cursor down",
-		},
-	},
-	{
-		Action: ActionPageUp,
-		KeyMap: KeyMap{
-			Primary: "pgup",
-			Help:    "Move up one page",
-		},
-	},
-	{
-		Action: ActionPageDown,
-		KeyMap: KeyMap{
-			Primary: "pgdown",
-			Help:    "Move down one page",
-		},
-	},
+var episodeSelectBindings = withNavigation([]Binding{
 	{
 		Action: ActionSelectEpisode,
 		KeyMap: KeyMap{
@@ -299,7 +297,7 @@ var episodeSelectBindings = []Binding{
 			Help:      "Search episodes",
 		},
 	},
-}
+})
 
 // searchModeBindings contains key bindings specific for when search mode is active
 var searchModeBindings = []Binding{
@@ -352,7 +350,7 @@ func GetBindingByKey(key string, bindings []Binding) (Action, string) {
 
 // GetActionByKey returns just the action for a given key, or an empty Action if not found
 func GetActionByKey(keyMsg tea.KeyMsg, name ContextName) Action {
-	if bindings, exists := contextBindings[name]; exists {
+	if bindings, exists := ContextBindings[name]; exists {
 		key := keyMsg.String()
 		for _, binding := range bindings {
 			if binding.KeyMap.Primary == key || binding.KeyMap.Secondary == key {
@@ -378,4 +376,9 @@ func GetHelpText(title string, bindings []Binding) string {
 		helpText += "* " + FormatKeyHelp(binding) + "\n"
 	}
 	return helpText
+}
+
+// withNavigation is a helper function to include navigation bindings in other binding sets
+func withNavigation(bindings []Binding) []Binding {
+	return append(append([]Binding{}, navigationBindings...), bindings...)
 }
