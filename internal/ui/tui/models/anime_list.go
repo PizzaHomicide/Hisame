@@ -158,6 +158,7 @@ func (m *AnimeListModel) View() string {
 		{"Enter", "Play next ep"},
 		{"Ctrl+p", "Select ep"},
 		{"+/-", "Adjust progress"},
+		{"d", "Details"},
 		{"Ctrl+h", "Help"},
 		{"Ctrl+c", "Quit"},
 	}
