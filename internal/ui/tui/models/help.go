@@ -2,6 +2,7 @@ package models
 
 import (
 	"fmt"
+	"github.com/PizzaHomicide/hisame/internal/ui/tui/components"
 	"strings"
 	"unicode/utf8"
 
@@ -106,9 +107,14 @@ func (m *HelpModel) View() string {
 	// Main content area with viewport
 	contentView := m.viewport.View()
 
-	// Footer with navigation help
-	scrollText := "↑/↓: Scroll • PgUp/PgDn: Page scroll • Home/End: Goto top/bottom • ESC: Return"
-	footer := styles.CenteredText(m.width, styles.Info.Render(scrollText))
+	// Define keybindings to be displayed in the footer
+	keyBindings := []components.KeyBinding{
+		{"↑/↓", "Scroll"},
+		{"PgUp/PgDn", "Page scroll"},
+		{"Home/End", "Top/Bottom"},
+		{"Esc", "Return"},
+	}
+	footer := components.KeyBindingsBar(m.width, keyBindings)
 
 	// Combine elements
 	return lipgloss.JoinVertical(

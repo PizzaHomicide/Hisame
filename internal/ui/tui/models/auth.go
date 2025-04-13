@@ -3,6 +3,7 @@ package models
 import (
 	"github.com/PizzaHomicide/hisame/internal/auth"
 	"github.com/PizzaHomicide/hisame/internal/log"
+	"github.com/PizzaHomicide/hisame/internal/ui/tui/components"
 	kb "github.com/PizzaHomicide/hisame/internal/ui/tui/keybindings"
 	"github.com/PizzaHomicide/hisame/internal/ui/tui/styles"
 	tea "github.com/charmbracelet/bubbletea"
@@ -108,8 +109,30 @@ func (m *AuthModel) View() string {
 	// Box the content
 	mainContent := styles.ContentBox(contentWidth, content, 1)
 
-	// Join header and content
-	combinedContent := lipgloss.JoinVertical(lipgloss.Center, header, mainContent)
+	var keyBindings []components.KeyBinding
+	if m.authInProgress {
+		keyBindings = []components.KeyBinding{
+			{"Browser", "Login with AniList"},
+			{"Ctrl+C", "Quit"},
+		}
+	} else {
+		keyBindings = []components.KeyBinding{
+			{"l", "Login"},
+			{"Ctrl+h", "Help"},
+			{"Ctrl+c", "Quit"},
+		}
+	}
+
+	// Create the keybinding bar
+	footer := components.KeyBindingsBar(contentWidth, keyBindings)
+
+	combinedContent := lipgloss.JoinVertical(
+		lipgloss.Center,
+		header,
+		mainContent,
+		"", // Add some spacing
+		footer,
+	)
 
 	// Center everything in the terminal
 	return styles.CenteredView(m.width, m.height, combinedContent)

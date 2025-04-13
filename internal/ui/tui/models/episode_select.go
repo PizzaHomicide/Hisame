@@ -3,6 +3,7 @@ package models
 import (
 	"fmt"
 	"github.com/PizzaHomicide/hisame/internal/log"
+	"github.com/PizzaHomicide/hisame/internal/ui/tui/components"
 	kb "github.com/PizzaHomicide/hisame/internal/ui/tui/keybindings"
 	"strings"
 
@@ -269,9 +270,15 @@ func (m *EpisodeSelectModel) View() string {
 		content = lipgloss.JoinVertical(lipgloss.Left, searchPrompt, content)
 	}
 
-	// Show key bindings at the bottom
-	keyBindings := " ↑/↓: Navigate • Enter: Select • Ctrl+f: Search • Esc: Cancel "
-	footer := styles.FilterStatus.Render(keyBindings)
+	// Define keybindings to be displayed in the footer
+	keyBindings := []components.KeyBinding{
+		{"↑/↓", "Scroll"},
+		{"Enter", "Select"},
+		{"/", "Search"},
+		{"Ctrl+h", "Help"},
+		{"Esc", "Return"},
+	}
+	footer := components.KeyBindingsBar(m.width, keyBindings)
 
 	// Layout the components
 	return fmt.Sprintf("%s\n\n%s\n\n%s", header, content, footer)

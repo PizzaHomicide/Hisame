@@ -11,6 +11,7 @@ import (
 	"github.com/PizzaHomicide/hisame/internal/domain"
 	"github.com/PizzaHomicide/hisame/internal/player"
 	"github.com/PizzaHomicide/hisame/internal/service"
+	"github.com/PizzaHomicide/hisame/internal/ui/tui/components"
 	"github.com/PizzaHomicide/hisame/internal/ui/tui/styles"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -151,10 +152,21 @@ func (m *AnimeListModel) View() string {
 		)
 	}
 
+	// Define keybindings to be displayed in footer
+	keyBindings := []components.KeyBinding{
+		{"↑/↓", "Navigate"},
+		{"Enter", "Play next ep"},
+		{"Ctrl+p", "Select ep"},
+		{"+/-", "Adjust progress"},
+		{"Ctrl+h", "Help"},
+		{"Ctrl+c", "Quit"},
+	}
+
 	// Build the view
 	header := styles.Header(m.width, "Hisame - Anime List")
 	filterStatus := m.renderFilterStatus()
 	content := m.renderAnimeList()
+	keyBar := components.KeyBindingsBar(m.width, keyBindings)
 
 	if m.searchMode {
 		// Show search input at the top of the content
@@ -163,7 +175,11 @@ func (m *AnimeListModel) View() string {
 	}
 
 	// Layout the components
-	return fmt.Sprintf("%s\n\n%s\n\n%s", header, filterStatus, content)
+	return fmt.Sprintf("%s\n\n%s\n\n%s\n\n%s",
+		header,
+		filterStatus,
+		content,
+		styles.CenteredText(m.width, keyBar))
 }
 
 // getSelectedAnime returns the currently selected anime or nil if none

@@ -22,6 +22,10 @@ var (
 	FilterStatus = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#CCCCCC")).
 			Padding(0, 2)
+
+	KeyStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#7D56F4")).
+			Bold(true)
 )
 
 // Layout helpers
