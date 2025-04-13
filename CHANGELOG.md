@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2025-04-13
+
+### Fixed
+- Now more selectively passes key presses to the viewport of the anime details screen.  No more surprising undocumented behaviour
+
 ## [0.2.1] - 2025-04-13
 
 ### Added

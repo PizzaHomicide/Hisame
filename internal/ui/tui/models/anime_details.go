@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/PizzaHomicide/hisame/internal/domain"
 	"github.com/PizzaHomicide/hisame/internal/ui/tui/components"
+	kb "github.com/PizzaHomicide/hisame/internal/ui/tui/keybindings"
 	"github.com/PizzaHomicide/hisame/internal/ui/tui/styles"
 	"github.com/PizzaHomicide/hisame/internal/ui/tui/util"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -46,9 +47,17 @@ func (m *AnimeDetailsModel) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		// Pass keys to viewport for scrolling
-		m.viewport, cmd = m.viewport.Update(msg)
-		return m, cmd
+		switch kb.GetActionByKey(msg, kb.ContextHelp) {
+		case kb.ActionMoveUp, kb.ActionMoveDown, kb.ActionPageUp, kb.ActionPageDown:
+			m.viewport, cmd = m.viewport.Update(msg)
+			return m, cmd
+		case kb.ActionMoveTop:
+			m.viewport.GotoTop()
+			return m, cmd
+		case kb.ActionMoveBottom:
+			m.viewport.GotoBottom()
+			return m, cmd
+		}
 
 	case tea.MouseMsg:
 		// Handle mouse scrolling
