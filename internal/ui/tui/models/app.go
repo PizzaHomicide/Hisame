@@ -357,6 +357,11 @@ func (m *AppModel) handleOrchestrationMsg(msg tea.Msg) tea.Cmd {
 			m.popLoadingModel()
 			return nil
 		}
+
+	case AnimeDetailsMsg:
+		detailsModel := NewAnimeDetailsModel(msg.Anime)
+		m.PushModel(detailsModel)
+		return detailsModel.Init()
 	}
 
 	return nil

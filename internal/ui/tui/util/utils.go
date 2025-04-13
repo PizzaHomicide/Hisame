@@ -1,6 +1,10 @@
 package util
 
-import "github.com/mattn/go-runewidth"
+import (
+	"fmt"
+	"github.com/mattn/go-runewidth"
+	"time"
+)
 
 // TruncateString cuts a string to fit within maxWidth visual width
 func TruncateString(s string, maxWidth int) string {
@@ -14,4 +18,18 @@ func TruncateString(s string, maxWidth int) string {
 		width += charWidth
 	}
 	return s // Return as is if it fits
+}
+
+// FormatTimeUntilAiring formats a duration into a human-readable string
+// showing two levels of time (days/hours or hours/minutes) at most
+func FormatTimeUntilAiring(seconds int64) string {
+	timeUntil := time.Duration(seconds) * time.Second
+
+	// Calculate days, hours, minutes
+	days := int(timeUntil.Hours() / 24)
+	hours := int(timeUntil.Hours()) % 24
+	minutes := int(timeUntil.Minutes()) % 60
+
+	// Format with consistent spacing:
+	return fmt.Sprintf("%3dd %02dh %02dm", days, hours, minutes)
 }

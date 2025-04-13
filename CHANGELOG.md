@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Important keybinds now shown at the bottom of each view
+- Add a 'details' view for each anime to see more information about it
 
 ## [0.2.0] - 2025-04-09
 

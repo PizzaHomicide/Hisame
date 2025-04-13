@@ -171,6 +171,16 @@ func (m *AnimeListModel) handleKeyPress(msg tea.KeyMsg) tea.Cmd {
 		return m.handleIncrementProgress()
 	case kb.ActionDecrementProgress:
 		return m.handleDecrementProgress()
+	case kb.ActionViewAnimeDetails:
+		anime := m.getSelectedAnime()
+		if anime == nil {
+			return Handled("view_anime_details:none_selected")
+		}
+		return func() tea.Msg {
+			return AnimeDetailsMsg{
+				Anime: anime,
+			}
+		}
 	}
 
 	return nil

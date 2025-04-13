@@ -109,6 +109,11 @@ type PlaybackCompletedMsg struct {
 	Progress      float64
 }
 
+// AnimeDetailsMsg is sent when a user wants to view the details for an anime
+type AnimeDetailsMsg struct {
+	Anime *domain.Anime
+}
+
 // HandledMsg is used when a model wants to bubble up the fact that it handled a message
 // and that further processing is likely not required (though the orchestration layer still
 // CAN do further processing if it deems necessary).

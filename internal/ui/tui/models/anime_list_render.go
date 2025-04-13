@@ -6,14 +6,12 @@ package models
 
 import (
 	"fmt"
-	"strings"
-	"time"
-
 	"github.com/PizzaHomicide/hisame/internal/domain"
 	"github.com/PizzaHomicide/hisame/internal/ui/tui/styles"
 	"github.com/PizzaHomicide/hisame/internal/ui/tui/util"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mattn/go-runewidth"
+	"strings"
 )
 
 // renderAnimeList renders the anime list for the current filters
@@ -150,7 +148,7 @@ func (m *AnimeListModel) formatAnimeListItem(anime *domain.Anime) string {
 	// Airing countdown
 	airingIn := ""
 	if anime.NextAiringEp != nil {
-		airingIn = formatTimeUntilAiring(anime.NextAiringEp.TimeUntilAir)
+		airingIn = util.FormatTimeUntilAiring(anime.NextAiringEp.TimeUntilAir)
 	} else if anime.Status == "FINISHED" {
 		airingIn = "Finished"
 	}
@@ -184,18 +182,4 @@ func (m *AnimeListModel) formatAnimeListItem(anime *domain.Anime) string {
 		statusText,
 		nextEpNum,
 		airingIn)
-}
-
-// formatTimeUntilAiring formats a duration into a human-readable string
-// showing two levels of time (days/hours or hours/minutes) at most
-func formatTimeUntilAiring(seconds int64) string {
-	timeUntil := time.Duration(seconds) * time.Second
-
-	// Calculate days, hours, minutes
-	days := int(timeUntil.Hours() / 24)
-	hours := int(timeUntil.Hours()) % 24
-	minutes := int(timeUntil.Minutes()) % 60
-
-	// Format with consistent spacing:
-	return fmt.Sprintf("%3dd %02dh %02dm", days, hours, minutes)
 }

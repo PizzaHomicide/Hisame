@@ -27,6 +27,7 @@ const (
 	// Anime list actions
 	ActionSelectEpisode               Action = "select_episode"
 	ActionRefreshAnimeList            Action = "refresh_anime_list"
+	ActionViewAnimeDetails            Action = "view_anime_details"
 	ActionPlayNextEpisode             Action = "play_next_episode"
 	ActionOpenEpisodeSelector         Action = "episode_selector"
 	ActionIncrementProgress           Action = "increment_progress"
@@ -55,6 +56,7 @@ const (
 	ContextEpisodeSelection ContextName = "episode_selection"
 	ContextSearchMode       ContextName = "search_mode"
 	ContextHelp             ContextName = "help"
+	ContextAnimeDetails     ContextName = "anime_details"
 )
 
 var ContextBindings = map[ContextName][]Binding{
@@ -64,6 +66,7 @@ var ContextBindings = map[ContextName][]Binding{
 	ContextEpisodeSelection: episodeSelectBindings,
 	ContextSearchMode:       searchModeBindings,
 	ContextHelp:             helpBindings,
+	ContextAnimeDetails:     animeDetailsBindings,
 }
 
 // KeyMap stores the mappings from actions to key sequences for each context
@@ -278,6 +281,13 @@ var animeListBindings = withNavigation([]Binding{
 			Help:    "Toggle finished airing filter",
 		},
 	},
+	{
+		Action: ActionViewAnimeDetails,
+		KeyMap: KeyMap{
+			Primary: "d",
+			Help:    "View anime details",
+		},
+	},
 })
 
 // episodeSelectBindings contains key bindings specific to the episode selection view
@@ -298,6 +308,9 @@ var episodeSelectBindings = withNavigation([]Binding{
 		},
 	},
 })
+
+// animDetailsBindings contains key bindings specific to the anime details screen
+var animeDetailsBindings = withNavigation([]Binding{})
 
 // searchModeBindings contains key bindings specific for when search mode is active
 var searchModeBindings = []Binding{
