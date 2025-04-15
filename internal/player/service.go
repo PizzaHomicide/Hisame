@@ -466,7 +466,7 @@ func (s *PlayerService) fetchStreamURL(ctx context.Context, url string) (string,
 }
 
 // LaunchPlayer starts playback with the given stream URL and returns a channel for playback events
-func (s *PlayerService) LaunchPlayer(ctx context.Context, streamURL string) (<-chan PlaybackEvent, error) {
+func (s *PlayerService) LaunchPlayer(ctx context.Context, streamURL string, episode AllAnimeEpisodeInfo) (<-chan PlaybackEvent, error) {
 	log.Info("Launching media player",
 		"player_type", s.config.Player.Type,
 		"player_path", s.config.Player.Path)
@@ -477,8 +477,10 @@ func (s *PlayerService) LaunchPlayer(ctx context.Context, streamURL string) (<-c
 		return nil, fmt.Errorf("failed to create video player: %w", err)
 	}
 
+	title := fmt.Sprintf("Ep %d - %s", episode.OverallEpisodeNumber, episode.PreferredTitle)
+
 	// Start playback and get the events channel
-	events, err := videoPlayer.Play(ctx, streamURL)
+	events, err := videoPlayer.Play(ctx, streamURL, title)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start player: %w", err)
 	}

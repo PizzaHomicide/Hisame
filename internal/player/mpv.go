@@ -31,8 +31,8 @@ func NewMPVPlayer(cfg *config.Config) *MPVPlayer {
 }
 
 // Play starts playback of the given URL, monitors for playback start, and returns a notification channel
-func (p *MPVPlayer) Play(ctx context.Context, url string) (<-chan PlaybackEvent, error) {
-	log.Info("Starting MPV playback", "url", url)
+func (p *MPVPlayer) Play(ctx context.Context, url string, title string) (<-chan PlaybackEvent, error) {
+	log.Info("Starting MPV playback", "url", url, "title", title)
 
 	// Create notification channel for playback events
 	events := make(chan PlaybackEvent, 10)
@@ -48,6 +48,10 @@ func (p *MPVPlayer) Play(ctx context.Context, url string) (<-chan PlaybackEvent,
 		"--no-terminal",                      // Disable terminal control
 		"--keep-open=no",                     // Exit when playback is complete
 		"--input-ipc-server=" + p.socketPath, // Set IPC socket path
+	}
+	// Specify title if one is supplied
+	if title != "" {
+		args = append(args, "--title="+title)
 	}
 
 	// Add any additional configured arguments

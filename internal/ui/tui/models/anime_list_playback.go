@@ -283,7 +283,7 @@ func (m *AnimeListModel) playEpisode(episode player.AllAnimeEpisodeInfo, anime *
 		playbackCtx, playbackCancel := context.WithCancel(context.Background())
 
 		// Launch the player with the stream URL and get the event channel
-		eventCh, err := m.playerService.LaunchPlayer(playbackCtx, streamURL)
+		eventCh, err := m.playerService.LaunchPlayer(playbackCtx, streamURL, episode)
 		if err != nil {
 			playbackCancel() // Clean up the playback context if launch fails
 			log.Error("Failed to launch media player", "error", err)

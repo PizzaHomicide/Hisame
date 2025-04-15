@@ -27,7 +27,7 @@ type PlaybackEvent struct {
 // VideoPlayer defines the interface for media player implementations
 type VideoPlayer interface {
 	// Play starts playback of the given URL and returns a channel for playback events
-	Play(ctx context.Context, url string) (<-chan PlaybackEvent, error)
+	Play(ctx context.Context, url string, title string) (<-chan PlaybackEvent, error)
 
 	// Stop stops the current playback
 	Stop() error
