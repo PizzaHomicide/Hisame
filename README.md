@@ -51,7 +51,7 @@ Hisame requires [MPV](https://mpv.io/) for media playback and automatic progress
 
 Hisame uses a YAML configuration file located at:
 
-- **Windows**: `%LOCALAPPDATA%\hisame\config.yaml`
+- **Windows**: `%APPDATA%%\hisame\config.yaml`
 - **macOS**: `~/Library/Application Support/hisame/config.yaml`
 - **Linux**: `$XDG_CONFIG_HOME/hisame/config.yaml` (or `~/.config/hisame/config.yaml` if XDG_CONFIG_HOME is not set)
 
