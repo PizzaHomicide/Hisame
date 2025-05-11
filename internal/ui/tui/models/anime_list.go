@@ -7,6 +7,8 @@ package models
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/PizzaHomicide/hisame/internal/config"
 	"github.com/PizzaHomicide/hisame/internal/domain"
 	"github.com/PizzaHomicide/hisame/internal/player"
@@ -17,8 +19,9 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"time"
 )
+
+var DEFAULT_STATUS_FILTERS = []domain.MediaStatus{domain.StatusCurrent, domain.StatusRepeating}
 
 // AnimeFilterSet represents a collection of filters to apply to the anime list
 type AnimeFilterSet struct {
@@ -55,7 +58,7 @@ func NewAnimeListModel(cfg *config.Config, animeService *service.AnimeService) *
 
 	// Default filters - initially show only CURRENT anime
 	defaultFilters := AnimeFilterSet{
-		statusFilters: []domain.MediaStatus{domain.StatusCurrent},
+		statusFilters: DEFAULT_STATUS_FILTERS,
 	}
 
 	ti := textinput.New()

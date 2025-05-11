@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - MPV window title now shows the episode number & anime title by default instead of part of the episode URL
+- Default status filters are now current + repeating, instead of just current
 
 ## [0.2.2] - 2025-04-13
 

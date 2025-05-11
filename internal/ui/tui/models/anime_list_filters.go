@@ -6,8 +6,11 @@ package models
 
 import (
 	"fmt"
-	kb "github.com/PizzaHomicide/hisame/internal/ui/tui/keybindings"
 	"strings"
+
+	kb "github.com/PizzaHomicide/hisame/internal/ui/tui/keybindings"
+
+	"slices"
 
 	"github.com/PizzaHomicide/hisame/internal/domain"
 	"github.com/PizzaHomicide/hisame/internal/log"
@@ -52,11 +55,11 @@ func (m *AnimeListModel) toggleFilter(action kb.Action) {
 
 	if index >= 0 {
 		// Status is already in filters, remove it
-		m.filters.statusFilters = append(m.filters.statusFilters[:index], m.filters.statusFilters[index+1:]...)
+		m.filters.statusFilters = slices.Delete(m.filters.statusFilters, index, index+1)
 
-		// If we removed all filters, default to CURRENT
+		// If we removed all filters, use the defaults
 		if len(m.filters.statusFilters) == 0 {
-			m.filters.statusFilters = []domain.MediaStatus{domain.StatusCurrent}
+			m.filters.statusFilters = DEFAULT_STATUS_FILTERS
 		}
 	} else {
 		// Status not in filters, add it
@@ -76,13 +79,7 @@ func (m *AnimeListModel) applyFilters() {
 		}
 
 		// Check if the anime's status is in our status filters
-		statusMatch := false
-		for _, status := range m.filters.statusFilters {
-			if anime.UserData.Status == status {
-				statusMatch = true
-				break
-			}
-		}
+		statusMatch := slices.Contains(m.filters.statusFilters, anime.UserData.Status)
 
 		if statusMatch {
 			statusFilteredAnime = append(statusFilteredAnime, anime)
