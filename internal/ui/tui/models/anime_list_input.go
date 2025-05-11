@@ -368,9 +368,16 @@ func (m *AnimeListModel) showMenu() tea.Cmd {
 			},
 		},
 		{
-			Text: "Update progress",
+			Text: "Refresh data",
 			Command: func() tea.Msg {
-				return HandledMsg{Message: "Would update progress"}
+				return MenuSelectionMsg{
+					CloseMenu: true,
+					NextMsg: LoadingMsg{
+						Type:      LoadingStart,
+						Message:   "Refreshing anime list...",
+						Operation: m.fetchAnimeListCmd(),
+					},
+				}
 			},
 		},
 		{
