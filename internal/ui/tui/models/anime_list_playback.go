@@ -30,71 +30,51 @@ func (m *AnimeListModel) handlePlaybackMessages(msg tea.Msg) (Model, tea.Cmd) {
 				"anilist_id", msg.Anime.ID)
 
 			// Start loading the sources for this episode
-			m.loading = true
-			m.loadingMsg = fmt.Sprintf("Loading sources for episode %d of %s...",
-				msg.Episode.OverallEpisodeNumber,
-				msg.Episode.PreferredTitle)
-
-			return m, tea.Batch(
-				m.spinner.Tick,
-				m.playEpisode(msg.Episode, msg.Anime),
-			)
-
-		case PlaybackEventSourcesLoaded:
-			m.loading = false
-
-			log.Info("Episode sources loaded successfully",
-				"title", msg.Episode.AllAnimeName,
-				"episode", msg.Episode.AllAnimeEpisodeNumber,
-				"source_count", len(msg.Sources.Sources))
-
-			// Log details about each source
-			for i, source := range msg.Sources.Sources {
-				log.Debug("Source option",
-					"index", i,
-					"name", source.SourceName,
-					"priority", source.Priority,
-					"type", source.Type,
-					"has_download", source.Downloads != nil)
+			return m, func() tea.Msg {
+				return LoadingMsg{
+					Type:      LoadingStart,
+					Message:   fmt.Sprintf("Loading sources for episode %d ..", msg.Episode.OverallEpisodeNumber),
+					Title:     msg.Anime.Title.Preferred,
+					Operation: m.playEpisode(msg.Episode, msg.Anime),
+				}
 			}
-
-			// At this point, we would normally launch the player
-			// For now, just log that we would play the highest priority source
-			if len(msg.Sources.Sources) > 0 {
-				bestSource := msg.Sources.Sources[0] // Already sorted by priority
-				log.Info("Would play this source (highest priority)",
-					"name", bestSource.SourceName,
-					"priority", bestSource.Priority,
-					"type", bestSource.Type,
-					"url", msg.StreamURL)
-			}
-
-			return m, nil
 
 		case PlaybackEventError:
-			m.loading = false
 
 			log.Error("Failed to load episode sources",
 				"title", msg.Episode.AllAnimeName,
 				"episode", msg.Episode.AllAnimeEpisodeNumber,
 				"error", msg.Error)
 
-			return m, nil
+			return m, func() tea.Msg {
+				return LoadingMsg{
+					Type: LoadingStop,
+				}
+			}
 
 		case PlaybackEventStarted:
-			m.loading = false
 			log.Info("Playback started",
 				"title", msg.Episode.AllAnimeName,
 				"episode", msg.Episode.AllAnimeEpisodeNumber)
-			return m, m.listenForPlaybackCompletion()
+			return m, tea.Batch(
+				func() tea.Msg {
+					return LoadingMsg{
+						Type: LoadingStop,
+					}
+				},
+				m.listenForPlaybackCompletion(),
+			)
 
 		case PlaybackEventEnded:
-			m.loading = false
 			log.Info("Playback ended",
 				"title", msg.Episode.AllAnimeName,
 				"episode", msg.Episode.AllAnimeEpisodeNumber,
 				"progress", msg.Progress)
-			return m, nil
+			return m, func() tea.Msg {
+				return LoadingMsg{
+					Type: LoadingStop,
+				}
+			}
 
 		case PlaybackEventProgress:
 			log.Debug("Playback progress",
@@ -115,15 +95,14 @@ func (m *AnimeListModel) handlePlaybackMessages(msg tea.Msg) (Model, tea.Cmd) {
 					"title", msg.Episode.AllAnimeName)
 
 				// Start loading the sources
-				m.loading = true
-				m.loadingMsg = fmt.Sprintf("Loading sources for episode %d of %s...",
-					msg.Episode.OverallEpisodeNumber,
-					msg.Episode.PreferredTitle)
-
-				return m, tea.Batch(
-					m.spinner.Tick,
-					m.playEpisode(*msg.Episode, nil),
-				)
+				return m, func() tea.Msg {
+					return LoadingMsg{
+						Type: LoadingStart,
+						Message: fmt.Sprintf("Loading sources for episode %d of %s...",
+							msg.Episode.OverallEpisodeNumber, msg.Episode.PreferredTitle),
+						Operation: m.playEpisode(*msg.Episode, nil),
+					}
+				}
 			}
 		}
 	}
@@ -277,10 +256,6 @@ func (m *AnimeListModel) playEpisode(episode player.AllAnimeEpisodeInfo, anime *
 		log.Info("Found playable stream URL",
 			"source_name", successSource.SourceName)
 
-		// Update loading message to indicate we're starting the player
-		m.loadingMsg = fmt.Sprintf("Launching media player for %s episode %s...",
-			episode.AllAnimeName, episode.AllAnimeEpisodeNumber)
-
 		// Create a new context for the playback monitoring that's independent of this function
 		playbackCtx, playbackCancel := context.WithCancel(context.Background())
 
@@ -295,10 +270,6 @@ func (m *AnimeListModel) playEpisode(episode player.AllAnimeEpisodeInfo, anime *
 				Episode: episode,
 			}
 		}
-
-		// Update loading message to indicate we're waiting for playback to start
-		m.loadingMsg = fmt.Sprintf("Waiting for playback to start for episode %d of %s...",
-			episode.OverallEpisodeNumber, episode.PreferredTitle)
 
 		// Wait for the first event (should be playback started or an error)
 		select {

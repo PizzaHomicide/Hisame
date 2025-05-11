@@ -12,7 +12,6 @@ import (
 
 	"github.com/PizzaHomicide/hisame/internal/domain"
 	kb "github.com/PizzaHomicide/hisame/internal/ui/tui/keybindings"
-	"github.com/charmbracelet/bubbles/spinner"
 
 	"github.com/PizzaHomicide/hisame/internal/log"
 	tea "github.com/charmbracelet/bubbletea"
@@ -32,23 +31,13 @@ func (m *AnimeListModel) Update(msg tea.Msg) (Model, tea.Cmd) {
 			return m, cmd
 		}
 
-	case spinner.TickMsg:
-		if m.loading {
-			var spinnerCmd tea.Cmd
-			m.spinner, spinnerCmd = m.spinner.Update(msg)
-			return m, spinnerCmd
-		}
-		return m, nil
-
 	case AnimeListMsg:
 		if msg.Success {
 			log.Debug("Anime list loaded")
-			m.loading = false
 			m.allAnime = m.animeService.GetAnimeList()
 			m.applyFilters()
 		} else {
 			log.Debug("Anime list load error", "error", msg.Error)
-			m.loading = false
 			m.loadError = msg.Error
 		}
 
@@ -299,16 +288,14 @@ func (m *AnimeListModel) handlePlayNextEpisode(anime *domain.Anime) tea.Cmd {
 		"current_progress", m.getSelectedAnime().UserData.Progress,
 		"next_ep", nextEpNumber)
 
-	// Set loading state with custom message
-	m.loading = true
-	m.loadingMsg = fmt.Sprintf("Finding episode %d for %s...",
-		nextEpNumber,
-		m.getSelectedAnime().Title.Preferred)
-
-	return tea.Batch(
-		m.spinner.Tick,
-		m.loadNextEpisode(nextEpNumber),
-	)
+	return func() tea.Msg {
+		return LoadingMsg{
+			Type:      LoadingStart,
+			Message:   fmt.Sprintf("Loading episode %d..", nextEpNumber),
+			Title:     anime.Title.Preferred,
+			Operation: m.loadNextEpisode(nextEpNumber),
+		}
+	}
 }
 
 // handleChooseEpisode initiates the episode selection flow
@@ -321,14 +308,14 @@ func (m *AnimeListModel) handleChooseEpisode(anime *domain.Anime) tea.Cmd {
 		"title", anime.Title.Preferred,
 		"id", anime.ID)
 
-	m.loading = true
-	m.loadingMsg = fmt.Sprintf("Finding episodes for %s...",
-		anime.Title.Preferred)
-
-	return tea.Batch(
-		m.spinner.Tick,
-		m.loadEpisodes(anime),
-	)
+	return func() tea.Msg {
+		return LoadingMsg{
+			Type:      LoadingStart,
+			Message:   fmt.Sprintf("Finding episodes .."),
+			Title:     anime.Title.Preferred,
+			Operation: m.loadEpisodes(anime),
+		}
+	}
 }
 
 func (m *AnimeListModel) showMenu() tea.Cmd {
