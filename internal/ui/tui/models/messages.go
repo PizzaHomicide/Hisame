@@ -126,3 +126,11 @@ func Handled(message string) tea.Cmd {
 		return HandledMsg{Message: message}
 	}
 }
+
+// ShowMenuMsg is sent when a menu should be displayed
+type ShowMenuMsg struct {
+	Menu *MenuModel
+}
+
+// CloseMenuMsg is sent when the menu should be closed
+type CloseMenuMsg struct{}

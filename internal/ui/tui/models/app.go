@@ -3,13 +3,14 @@ package models
 import (
 	"errors"
 	"fmt"
+	"os"
+
 	"github.com/PizzaHomicide/hisame/internal/config"
 	"github.com/PizzaHomicide/hisame/internal/log"
 	"github.com/PizzaHomicide/hisame/internal/repository/anilist"
 	"github.com/PizzaHomicide/hisame/internal/service"
 	kb "github.com/PizzaHomicide/hisame/internal/ui/tui/keybindings"
 	tea "github.com/charmbracelet/bubbletea"
-	"os"
 )
 
 // AppModel is the main application model that coordinates all child models.  It is the high level wrapper.
@@ -362,6 +363,15 @@ func (m *AppModel) handleOrchestrationMsg(msg tea.Msg) tea.Cmd {
 		detailsModel := NewAnimeDetailsModel(msg.Anime)
 		m.PushModel(detailsModel)
 		return detailsModel.Init()
+
+	case ShowMenuMsg:
+		m.PushModel(msg.Menu)
+		return nil
+
+	case CloseMenuMsg:
+		if m.CurrentModel().ViewType() == ViewMenu {
+			m.PopModel()
+		}
 	}
 
 	return nil

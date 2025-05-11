@@ -1,6 +1,9 @@
 package keybindings
 
-import tea "github.com/charmbracelet/bubbletea"
+import (
+	"github.com/PizzaHomicide/hisame/internal/log"
+	tea "github.com/charmbracelet/bubbletea"
+)
 
 // Action represents a specific action that can be triggered by a key
 type Action string
@@ -40,7 +43,6 @@ const (
 	ActionToggleFilterStatusRepeating Action = "toggle_filter_status_repeating"
 	ActionToggleFilterNewEpisodes     Action = "toggle_filter_new_episodes"
 	ActionToggleFilterFinishedAiring  Action = "toggle_filter_finished_airing"
-	ActionTemporaryMenu               Action = "tmp"
 
 	// Search mode actions
 	ActionEnableSearch   Action = "enable_search"
@@ -48,6 +50,7 @@ const (
 
 	// Menu actions
 	ActionSelectMenuItem Action = "select_menu_item"
+	ActionShowMenu       Action = "show_menu"
 )
 
 // ContextName represents a specific UI context in the application that has its own keybinds
@@ -185,7 +188,13 @@ var helpBindings = withNavigation([]Binding{})
 
 // animeListBindings contains key bindings specific to the anime list view
 var animeListBindings = withNavigation([]Binding{
-
+	{
+		Action: ActionShowMenu,
+		KeyMap: KeyMap{
+			Primary: "enter",
+			Help:    "Show menu for selected anime",
+		},
+	},
 	{
 		Action: ActionRefreshAnimeList,
 		KeyMap: KeyMap{
@@ -196,9 +205,8 @@ var animeListBindings = withNavigation([]Binding{
 	{
 		Action: ActionPlayNextEpisode,
 		KeyMap: KeyMap{
-			Primary:   "enter",
-			Secondary: "p",
-			Help:      "Play next episode",
+			Primary: "p",
+			Help:    "Play next episode",
 		},
 	},
 	{
@@ -383,9 +391,14 @@ func GetActionByKey(keyMsg tea.KeyMsg, name ContextName) Action {
 		key := keyMsg.String()
 		for _, binding := range bindings {
 			if binding.KeyMap.Primary == key || binding.KeyMap.Secondary == key {
+				log.Trace("Action determined from keypress", "action", binding.Action, "keypress", key, "context", name)
 				return binding.Action
 			}
 		}
+	}
+	// Don't log not finding an action in global keybinds, as that will always happen for view specific keybinds
+	if name != ContextGlobal {
+		log.Warn("Could not find action for keypress", "keypress", keyMsg.String(), "context", name)
 	}
 	return ""
 }

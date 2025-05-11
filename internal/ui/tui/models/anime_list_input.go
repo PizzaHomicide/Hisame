@@ -8,9 +8,10 @@ package models
 import (
 	"context"
 	"fmt"
+	"time"
+
 	kb "github.com/PizzaHomicide/hisame/internal/ui/tui/keybindings"
 	"github.com/charmbracelet/bubbles/spinner"
-	"time"
 
 	"github.com/PizzaHomicide/hisame/internal/log"
 	tea "github.com/charmbracelet/bubbletea"
@@ -181,6 +182,8 @@ func (m *AnimeListModel) handleKeyPress(msg tea.KeyMsg) tea.Cmd {
 				Anime: anime,
 			}
 		}
+	case kb.ActionShowMenu:
+		return m.showMenu()
 	}
 
 	return nil
@@ -302,4 +305,51 @@ func (m *AnimeListModel) handleChooseEpisode() tea.Cmd {
 		m.spinner.Tick,
 		m.loadEpisodes(),
 	)
+}
+
+func (m *AnimeListModel) showMenu() tea.Cmd {
+	// Create a sample menu with various options
+	menuItems := []MenuItem{
+		{
+			Text: "Play next episode",
+			Command: tea.Batch(
+				func() tea.Msg {
+					return CloseMenuMsg{}
+				},
+				m.handlePlayEpisode(),
+			),
+		},
+		{
+			Text: "Select specific episode",
+			Command: func() tea.Msg {
+				return CloseMenuMsg{}
+			},
+		},
+		{
+			Text: "View anime details",
+			Command: func() tea.Msg {
+				return HandledMsg{Message: "Would show anime details"}
+			},
+		},
+		{
+			Text: "Update progress",
+			Command: func() tea.Msg {
+				return HandledMsg{Message: "Would update progress"}
+			},
+		},
+		{
+			Text:    "Exit application",
+			Command: tea.Quit,
+		},
+	}
+
+	// Create the menu model
+	menuModel := NewMenuModel("Anime Actions", menuItems)
+
+	// Return a command that will push this menu onto the model stack
+	return func() tea.Msg {
+		return ShowMenuMsg{
+			Menu: menuModel,
+		}
+	}
 }
