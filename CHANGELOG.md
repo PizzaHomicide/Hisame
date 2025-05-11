@@ -7,9 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Added a menu system to make actions more discoverable.  Press 'enter' on the anime list view screen to see it
+- Anime list view menu supports playing next episode
+- Anime list view menu supports selecting an episode
+- Anime list view menu includes an option to quit the application
+
 ### Changed
 - MPV window title now shows the episode number & anime title by default instead of part of the episode URL
 - Default status filters are now current + repeating, instead of just current
+- Pressing 'enter' on the anime list menu no longer plays the next episode.  It now opens a context menu
 
 ## [0.2.2] - 2025-04-13
 

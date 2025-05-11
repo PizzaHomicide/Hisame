@@ -7,8 +7,9 @@ package models
 import (
 	"context"
 	"fmt"
-	"github.com/PizzaHomicide/hisame/internal/domain"
 	"time"
+
+	"github.com/PizzaHomicide/hisame/internal/domain"
 
 	"github.com/PizzaHomicide/hisame/internal/log"
 	"github.com/PizzaHomicide/hisame/internal/player"
@@ -131,12 +132,13 @@ func (m *AnimeListModel) handlePlaybackMessages(msg tea.Msg) (Model, tea.Cmd) {
 }
 
 // loadEpisodes loads all episodes for the selected anime
-func (m *AnimeListModel) loadEpisodes() tea.Cmd {
+func (m *AnimeListModel) loadEpisodes(anime *domain.Anime) tea.Cmd {
+	if anime == nil {
+		return Handled("load_anime:nil_anime")
+	}
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-
-		anime := m.getSelectedAnime()
 
 		epResult, err := m.playerService.FindEpisodes(
 			ctx,

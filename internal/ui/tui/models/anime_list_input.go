@@ -97,20 +97,22 @@ func (m *AnimeListModel) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 
 	case PlayNextEpisodeMsg:
-		var selectedAnime *domain.Anime
-		for _, anime := range m.allAnime {
-			if anime.ID == msg.AnimeID {
-				selectedAnime = anime
-				break
-			}
-		}
-
+		var selectedAnime = m.findAnimeById(msg.AnimeID)
 		if selectedAnime == nil {
 			log.Warn("Received message to play anime, but could not find ID in list", "anime_id", msg.AnimeID)
 			return m, nil
 		}
 
-		return m, m.handlePlayEpisode(selectedAnime)
+		return m, m.handlePlayNextEpisode(selectedAnime)
+
+	case ChooseEpisodeMsg:
+		var selectedAnime = m.findAnimeById(msg.AnimeID)
+		if selectedAnime == nil {
+			log.Warn("Received message to play anime, but could not find ID in list", "anime_id", msg.AnimeID)
+			return m, nil
+		}
+
+		return m, m.handleChooseEpisode(selectedAnime)
 	}
 
 	// Handle other message types in the playback file
@@ -173,9 +175,9 @@ func (m *AnimeListModel) handleKeyPress(msg tea.KeyMsg) tea.Cmd {
 		m.searchInput.Focus()
 		return Handled("search:enable")
 	case kb.ActionPlayNextEpisode:
-		return m.handlePlayEpisode(m.getSelectedAnime())
+		return m.handlePlayNextEpisode(m.getSelectedAnime())
 	case kb.ActionOpenEpisodeSelector:
-		return m.handleChooseEpisode()
+		return m.handleChooseEpisode(m.getSelectedAnime())
 	case kb.ActionRefreshAnimeList:
 		return func() tea.Msg {
 			return LoadingMsg{
@@ -279,8 +281,8 @@ func (m *AnimeListModel) handleDecrementProgress() tea.Cmd {
 	}
 }
 
-// handlePlayEpisode initiates playback of the next episode
-func (m *AnimeListModel) handlePlayEpisode(anime *domain.Anime) tea.Cmd {
+// handlePlayNextEpisode initiates playback of the next episode
+func (m *AnimeListModel) handlePlayNextEpisode(anime *domain.Anime) tea.Cmd {
 	if anime == nil {
 		return Handled("play_next_episode:none_selected")
 	}
@@ -310,18 +312,22 @@ func (m *AnimeListModel) handlePlayEpisode(anime *domain.Anime) tea.Cmd {
 }
 
 // handleChooseEpisode initiates the episode selection flow
-func (m *AnimeListModel) handleChooseEpisode() tea.Cmd {
+func (m *AnimeListModel) handleChooseEpisode(anime *domain.Anime) tea.Cmd {
+	if anime == nil {
+		return Handled("choose_episode:none_selected")
+	}
+
 	log.Info("Choose episode to play",
-		"title", m.getSelectedAnime().Title.Preferred,
-		"id", m.getSelectedAnime().ID)
+		"title", anime.Title.Preferred,
+		"id", anime.ID)
 
 	m.loading = true
 	m.loadingMsg = fmt.Sprintf("Finding episodes for %s...",
-		m.getSelectedAnime().Title.Preferred)
+		anime.Title.Preferred)
 
 	return tea.Batch(
 		m.spinner.Tick,
-		m.loadEpisodes(),
+		m.loadEpisodes(anime),
 	)
 }
 
@@ -344,7 +350,9 @@ func (m *AnimeListModel) showMenu() tea.Cmd {
 			Command: func() tea.Msg {
 				return MenuSelectionMsg{
 					CloseMenu: true,
-					NextMsg:   nil,
+					NextMsg: ChooseEpisodeMsg{
+						AnimeID: m.getSelectedAnime().ID,
+					},
 				}
 			},
 		},
@@ -375,4 +383,17 @@ func (m *AnimeListModel) showMenu() tea.Cmd {
 			Menu: menuModel,
 		}
 	}
+}
+
+// findAnimeById finds an anime in the loaded list and returns it.  Nil if not found
+func (m *AnimeListModel) findAnimeById(id int) *domain.Anime {
+	var selected *domain.Anime
+	// TODO: Maybe we should store allAnime in a map of id -> anime for faster lookups?  allAnime could be hundreds..
+	for _, anime := range m.allAnime {
+		if anime.ID == id {
+			selected = anime
+			break
+		}
+	}
+	return selected
 }

@@ -146,3 +146,8 @@ type MenuSelectionMsg struct {
 type PlayNextEpisodeMsg struct {
 	AnimeID int
 }
+
+// ChooseEpisodeMsg is sent when we want to show the user the episode selection screen
+type ChooseEpisodeMsg struct {
+	AnimeID int
+}
