@@ -375,7 +375,7 @@ func (m *AnimeListModel) showMenu() tea.Cmd {
 	}
 
 	// Create the menu model
-	menuModel := NewMenuModel("Anime Actions", menuItems)
+	menuModel := NewMenuModel("Actions - "+m.getSelectedAnime().Title.Preferred, menuItems)
 
 	// Return a command that will push this menu onto the model stack
 	return func() tea.Msg {
