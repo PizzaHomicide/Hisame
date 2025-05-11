@@ -359,7 +359,12 @@ func (m *AnimeListModel) showMenu() tea.Cmd {
 		{
 			Text: "View anime details",
 			Command: func() tea.Msg {
-				return HandledMsg{Message: "Would show anime details"}
+				return MenuSelectionMsg{
+					CloseMenu: true,
+					NextMsg: AnimeDetailsMsg{
+						Anime: m.getSelectedAnime(),
+					},
+				}
 			},
 		},
 		{
