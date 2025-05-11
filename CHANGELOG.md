@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Anime list view menu supports selecting an episode
 - Anime list view menu supports showing anime details
 - Anime list view menu includes an option to refresh anime data
+- Anime list view menu includes an option to close the menu and go back
 - Anime list view menu includes an option to quit the application
 
 ### Changed

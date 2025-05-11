@@ -389,7 +389,15 @@ func (m *AnimeListModel) showMenu() tea.Cmd {
 			},
 		},
 		{
-			Text:    "Exit application",
+			Text: "Back",
+			Command: func() tea.Msg {
+				return MenuSelectionMsg{
+					CloseMenu: true,
+				}
+			},
+		},
+		{
+			Text:    "Quit",
 			Command: tea.Quit,
 		},
 	}
