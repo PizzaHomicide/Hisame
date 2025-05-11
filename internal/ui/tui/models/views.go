@@ -13,6 +13,7 @@ const (
 	ViewEpisodeSelect View = "episode-select"
 	ViewLoading       View = "loading"
 	ViewAnimeDetails  View = "anime-details"
+	ViewMenu          View = "menu"
 )
 
 // Model is the interface that all our models should implement

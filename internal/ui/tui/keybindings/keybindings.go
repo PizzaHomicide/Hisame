@@ -40,10 +40,14 @@ const (
 	ActionToggleFilterStatusRepeating Action = "toggle_filter_status_repeating"
 	ActionToggleFilterNewEpisodes     Action = "toggle_filter_new_episodes"
 	ActionToggleFilterFinishedAiring  Action = "toggle_filter_finished_airing"
+	ActionTemporaryMenu               Action = "tmp"
 
 	// Search mode actions
 	ActionEnableSearch   Action = "enable_search"
 	ActionSearchComplete Action = "search_complete"
+
+	// Menu actions
+	ActionSelectMenuItem Action = "select_menu_item"
 )
 
 // ContextName represents a specific UI context in the application that has its own keybinds
@@ -57,6 +61,7 @@ const (
 	ContextSearchMode       ContextName = "search_mode"
 	ContextHelp             ContextName = "help"
 	ContextAnimeDetails     ContextName = "anime_details"
+	ContextMenu             ContextName = "menu"
 )
 
 var ContextBindings = map[ContextName][]Binding{
@@ -67,6 +72,7 @@ var ContextBindings = map[ContextName][]Binding{
 	ContextSearchMode:       searchModeBindings,
 	ContextHelp:             helpBindings,
 	ContextAnimeDetails:     animeDetailsBindings,
+	ContextMenu:             menuBindings,
 }
 
 // KeyMap stores the mappings from actions to key sequences for each context
@@ -330,6 +336,16 @@ var searchModeBindings = []Binding{
 		},
 	},
 }
+
+var menuBindings = withNavigation([]Binding{
+	{
+		Action: ActionSelectMenuItem,
+		KeyMap: KeyMap{
+			Primary: "enter",
+			Help:    "Select menu item",
+		},
+	},
+})
 
 // GetActionKey returns the primary key for an action
 func GetActionKey(action Action, bindings []Binding) string {
