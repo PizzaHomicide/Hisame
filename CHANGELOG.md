@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added a menu system to make actions more discoverable.  Press 'enter' on the anime list view screen to see it
 - Anime list view menu supports playing next episode
 - Anime list view menu supports selecting an episode
+- Anime list view menu supports showing anime details
+- Anime list view menu includes an option to refresh anime data
 - Anime list view menu includes an option to quit the application
 
 ### Changed

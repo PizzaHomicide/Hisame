@@ -49,11 +49,12 @@ func (m AppModel) CurrentModel() Model {
 }
 
 // PushModel adds a model to the top of the stack and ensures it's properly sized
-func (m *AppModel) PushModel(model Model) {
+func (m *AppModel) PushModel(model Model) tea.Cmd {
 	model.Resize(m.width, m.height)
 	// Add to the stack
 	m.modelStack = append(m.modelStack, model)
 	log.Debug("Pushed model onto stack", "model_type", model.ViewType(), "stack_size", len(m.modelStack))
+	return model.Init()
 }
 
 // PopModel removes the top model from the stack
@@ -269,9 +270,8 @@ func (m *AppModel) handleOrchestrationMsg(msg tea.Msg) tea.Cmd {
 			}
 
 			log.Info("Episodes loaded", "count", len(msg.Episodes), "title", msg.Title)
-			m.PushModel(NewEpisodeSelectModel(msg.Episodes, msg.Title))
 			m.disableLoading()
-			return nil
+			return m.PushModel(NewEpisodeSelectModel(msg.Episodes, msg.Title))
 
 		case EpisodeEventSelected:
 			if msg.Episode != nil {
@@ -342,17 +342,17 @@ func (m *AppModel) handleOrchestrationMsg(msg tea.Msg) tea.Cmd {
 			}
 
 			log.Debug("Starting loading state", "message", msg.Message)
-			m.PushModel(loadingModel)
+			initCmd := m.PushModel(loadingModel)
 
 			// If there's an operation to run during loading, execute it
 			if msg.Operation != nil {
 				return tea.Batch(
-					loadingModel.Init(),
+					initCmd,
 					msg.Operation,
 				)
 			}
 
-			return loadingModel.Init()
+			return initCmd
 
 		case LoadingStop:
 			m.popLoadingModel()
@@ -361,12 +361,10 @@ func (m *AppModel) handleOrchestrationMsg(msg tea.Msg) tea.Cmd {
 
 	case AnimeDetailsMsg:
 		detailsModel := NewAnimeDetailsModel(msg.Anime)
-		m.PushModel(detailsModel)
-		return detailsModel.Init()
+		return m.PushModel(detailsModel)
 
 	case ShowMenuMsg:
-		m.PushModel(msg.Menu)
-		return nil
+		return m.PushModel(msg.Menu)
 
 	case MenuSelectionMsg:
 		if msg.CloseMenu && m.CurrentModel().ViewType() == ViewMenu {
@@ -424,7 +422,7 @@ func (m *AppModel) handleToggleHelp() tea.Cmd {
 			return tea.Quit
 		}
 
-		m.PushModel(NewHelpModel(m.CurrentModel().ViewType()))
+		return m.PushModel(NewHelpModel(m.CurrentModel().ViewType()))
 	}
 	return nil
 }

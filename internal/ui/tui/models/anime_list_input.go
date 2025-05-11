@@ -335,6 +335,10 @@ func (m *AnimeListModel) showMenu() tea.Cmd {
 	// Create a sample menu with various options
 	menuItems := []MenuItem{
 		{
+			Text:        "Anime options",
+			IsSeparator: true,
+		},
+		{
 			Text: "Play next episode",
 			Command: func() tea.Msg {
 				return MenuSelectionMsg{
@@ -366,6 +370,10 @@ func (m *AnimeListModel) showMenu() tea.Cmd {
 					},
 				}
 			},
+		},
+		{
+			Text:        "System options",
+			IsSeparator: true,
 		},
 		{
 			Text: "Refresh data",

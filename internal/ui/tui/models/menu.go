@@ -1,6 +1,8 @@
 package models
 
 import (
+	"strings"
+
 	"github.com/PizzaHomicide/hisame/internal/log"
 	"github.com/PizzaHomicide/hisame/internal/ui/tui/components"
 	kb "github.com/PizzaHomicide/hisame/internal/ui/tui/keybindings"
@@ -15,6 +17,8 @@ type MenuItem struct {
 	Text string
 	// Command executed when an item is selected
 	Command tea.Cmd
+	// IsSeparator indicates that this is a visual separator, not a selectable item
+	IsSeparator bool
 }
 
 type MenuModel struct {
@@ -37,6 +41,7 @@ func NewMenuModel(title string, items []MenuItem) *MenuModel {
 }
 
 func (m *MenuModel) Init() tea.Cmd {
+	m.ensureValidCursor()
 	return nil
 }
 
@@ -45,15 +50,11 @@ func (m *MenuModel) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch kb.GetActionByKey(msg, kb.ContextMenu) {
 		case kb.ActionMoveUp:
-			if m.Cursor > 0 {
-				m.Cursor--
-			}
+			m.moveCursorUp()
 			return m, nil
 
 		case kb.ActionMoveDown:
-			if m.Cursor < len(m.Items)-1 {
-				m.Cursor++
-			}
+			m.moveCursorDown()
 			return m, nil
 
 		case kb.ActionSelectMenuItem:
@@ -78,26 +79,9 @@ func (m *MenuModel) View() string {
 
 	header := styles.Header(m.width, m.Title)
 
-	cursorStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("#FFFFFF")).
-		Background(lipgloss.Color("#7D56F4")).
-		Width(m.width-8). // Account for padding and cursor indicator
-		Padding(0, 1)
-
-	itemStyle := lipgloss.NewStyle().
-		Width(m.width-8).
-		Padding(0, 1)
-
 	var menuContent string
 	for i, item := range m.Items {
-		var renderedItem string
-		if i == m.Cursor {
-			renderedItem = "> " + cursorStyle.Render(item.Text)
-		} else {
-			renderedItem = "  " + itemStyle.Render(item.Text)
-		}
-		menuContent += renderedItem + "\n"
+		menuContent += item.Render(m.width, i == m.Cursor)
 	}
 
 	content := styles.ContentBox(m.width-4, menuContent, 1)
@@ -123,4 +107,124 @@ func (m *MenuModel) View() string {
 func (m *MenuModel) Resize(width, height int) {
 	m.width = width
 	m.height = height
+}
+
+// Render renders a menu item with the given parameters
+func (item MenuItem) Render(width int, isSelected bool) string {
+	if item.IsSeparator {
+		return item.renderSeparator(width)
+	}
+	return item.renderSelectable(width, isSelected)
+}
+
+// renderSeparator renders the item as a separator (not selectable)
+func (item MenuItem) renderSeparator(width int) string {
+	if item.Text == "" {
+		// No separator text, so just use a plain line renderSeparator
+		return "  " + strings.Repeat("-", width-10) + "\n"
+	}
+	// Calculate the space available for dashes
+	separatorStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#888888"))
+
+	textWidth := lipgloss.Width(item.Text)
+	availableWidth := width - 10                   // Account for margins and padding
+	dashesNeeded := availableWidth - textWidth - 2 // -2 for spaces around text
+
+	// If text is too long, just show the text
+	if dashesNeeded <= 0 {
+		return "  " + separatorStyle.Render(item.Text) + "\n"
+	}
+
+	// Create dashes on both sides of the text
+	dashesPerSide := dashesNeeded / 2
+	leftDashes := strings.Repeat("─", dashesPerSide)
+	rightDashes := strings.Repeat("─", dashesNeeded-dashesPerSide)
+
+	// Combine into the separator with text
+	separator := leftDashes + " " + separatorStyle.Render(item.Text) + " " + rightDashes
+
+	return "  " + separator + "\n"
+}
+
+// renderSelectable renders the item as a selectable menu item
+func (item MenuItem) renderSelectable(width int, isSelected bool) string {
+	selectedStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#FFFFFF")).
+		Background(lipgloss.Color("#7D56F4")).
+		Width(width-8).
+		Padding(0, 1)
+
+	normalStyle := lipgloss.NewStyle().
+		Width(width-8).
+		Padding(0, 1)
+
+	// Determine style based on selection
+	var renderedItem string
+	if isSelected {
+		renderedItem = selectedStyle.Render(item.Text)
+	} else {
+		renderedItem = normalStyle.Render(item.Text)
+	}
+
+	// Add cursor indicator
+	if isSelected {
+		renderedItem = "> " + renderedItem
+	} else {
+		renderedItem = "  " + renderedItem
+	}
+
+	return renderedItem + "\n"
+}
+
+// ensureValidCursor ensures the cursor is on a selectable item when the menu is first created
+func (m *MenuModel) ensureValidCursor() {
+	log.Trace("Ensuring valid cursor", "cursor", m.Cursor)
+	if len(m.Items) == 0 {
+		log.Trace("No item, early return")
+		return
+	}
+
+	// If we're already on a non-separator, we're good
+	if !m.Items[m.Cursor].IsSeparator {
+		log.Trace("Already on a non-separator!", "item", m.Items[m.Cursor].Text)
+		return
+	}
+
+	// moveCursorDown handles for separators, so this will move to the first non-separator if any
+	log.Trace("Trying to move down")
+	m.moveCursorDown()
+}
+
+// moveCursorUp moves the cursor up to the previous selectable item
+func (m *MenuModel) moveCursorUp() {
+	startPos := m.Cursor
+	m.Cursor--
+
+	// Keep moving up until we find a selectable item or hit the top
+	for m.Cursor >= 0 && m.Items[m.Cursor].IsSeparator {
+		m.Cursor--
+	}
+
+	// If we went past the top, restore the original position
+	if m.Cursor < 0 {
+		m.Cursor = startPos
+	}
+}
+
+// moveCursorDown moves the cursor down to the next selectable item
+func (m *MenuModel) moveCursorDown() {
+	startPos := m.Cursor
+	m.Cursor++
+
+	// Keep moving down until we find a selectable item or hit the bottom
+	for m.Cursor < len(m.Items) && m.Items[m.Cursor].IsSeparator {
+		m.Cursor++
+	}
+
+	// If we went past the bottom, restore the original position
+	if m.Cursor >= len(m.Items) {
+		m.Cursor = startPos
+	}
 }
