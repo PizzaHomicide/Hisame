@@ -368,10 +368,18 @@ func (m *AppModel) handleOrchestrationMsg(msg tea.Msg) tea.Cmd {
 		m.PushModel(msg.Menu)
 		return nil
 
-	case CloseMenuMsg:
-		if m.CurrentModel().ViewType() == ViewMenu {
+	case MenuSelectionMsg:
+		if msg.CloseMenu && m.CurrentModel().ViewType() == ViewMenu {
 			m.PopModel()
 		}
+
+		if msg.NextMsg != nil {
+			return func() tea.Msg {
+				return msg.NextMsg
+			}
+		}
+
+		return nil
 	}
 
 	return nil

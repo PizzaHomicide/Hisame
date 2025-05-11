@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/PizzaHomicide/hisame/internal/domain"
 	kb "github.com/PizzaHomicide/hisame/internal/ui/tui/keybindings"
 	"github.com/charmbracelet/bubbles/spinner"
 
@@ -95,6 +96,21 @@ func (m *AnimeListModel) Update(msg tea.Msg) (Model, tea.Cmd) {
 			}
 		}
 
+	case PlayNextEpisodeMsg:
+		var selectedAnime *domain.Anime
+		for _, anime := range m.allAnime {
+			if anime.ID == msg.AnimeID {
+				selectedAnime = anime
+				break
+			}
+		}
+
+		if selectedAnime == nil {
+			log.Warn("Received message to play anime, but could not find ID in list", "anime_id", msg.AnimeID)
+			return m, nil
+		}
+
+		return m, m.handlePlayEpisode(selectedAnime)
 	}
 
 	// Handle other message types in the playback file
@@ -157,7 +173,7 @@ func (m *AnimeListModel) handleKeyPress(msg tea.KeyMsg) tea.Cmd {
 		m.searchInput.Focus()
 		return Handled("search:enable")
 	case kb.ActionPlayNextEpisode:
-		return m.handlePlayEpisode()
+		return m.handlePlayEpisode(m.getSelectedAnime())
 	case kb.ActionOpenEpisodeSelector:
 		return m.handleChooseEpisode()
 	case kb.ActionRefreshAnimeList:
@@ -264,9 +280,11 @@ func (m *AnimeListModel) handleDecrementProgress() tea.Cmd {
 }
 
 // handlePlayEpisode initiates playback of the next episode
-func (m *AnimeListModel) handlePlayEpisode() tea.Cmd {
+func (m *AnimeListModel) handlePlayEpisode(anime *domain.Anime) tea.Cmd {
+	if anime == nil {
+		return Handled("play_next_episode:none_selected")
+	}
 	// Only attempt playback if there are unwatched episodes available
-	anime := m.getSelectedAnime()
 	if !anime.HasUnwatchedEpisodes() {
 		log.Info("No unwatched episodes available", "title", anime.Title.Preferred,
 			"id", anime.ID, "progress", anime.UserData.Progress, "latest_aired", anime.GetLatestAiredEpisode())
@@ -312,17 +330,22 @@ func (m *AnimeListModel) showMenu() tea.Cmd {
 	menuItems := []MenuItem{
 		{
 			Text: "Play next episode",
-			Command: tea.Batch(
-				func() tea.Msg {
-					return CloseMenuMsg{}
-				},
-				m.handlePlayEpisode(),
-			),
+			Command: func() tea.Msg {
+				return MenuSelectionMsg{
+					CloseMenu: true,
+					NextMsg: PlayNextEpisodeMsg{
+						AnimeID: m.getSelectedAnime().ID,
+					},
+				}
+			},
 		},
 		{
 			Text: "Select specific episode",
 			Command: func() tea.Msg {
-				return CloseMenuMsg{}
+				return MenuSelectionMsg{
+					CloseMenu: true,
+					NextMsg:   nil,
+				}
 			},
 		},
 		{

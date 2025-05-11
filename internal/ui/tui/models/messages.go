@@ -132,5 +132,17 @@ type ShowMenuMsg struct {
 	Menu *MenuModel
 }
 
-// CloseMenuMsg is sent when the menu should be closed
-type CloseMenuMsg struct{}
+// MenuSelectionMsg is sent when a menu item is selected
+type MenuSelectionMsg struct {
+	CloseMenu bool    // Whether to close the menu after selection
+	NextMsg   tea.Msg // The message to propagate next
+}
+
+// PlayNextEpisodeMsg is sent when the next episode of a given anime should be played
+// Thoughts:  Consider if this should be a more populated message.  Right now it expects the anime list model to handle
+//
+//	           it, but what if we wanted something else to?  We could provide all the info required here, then some playback
+//				  handler could deal with it.
+type PlayNextEpisodeMsg struct {
+	AnimeID int
+}
