@@ -158,10 +158,8 @@ func (m *AnimeListModel) View() string {
 	// Define keybindings to be displayed in footer
 	keyBindings := []components.KeyBinding{
 		{"↑/↓", "Navigate"},
-		{"Enter", "Play next ep"},
-		{"Ctrl+p", "Select ep"},
+		{"Enter", "Anime context menu"},
 		{"+/-", "Adjust progress"},
-		{"d", "Details"},
 		{"Ctrl+h", "Help"},
 		{"Ctrl+c", "Quit"},
 	}

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2025-05-11
+
+### Fixed
+- Updated keybinds shown at bottom of anime list view to correctly indicate that 'enter' opens the context menu
+
+### Changed
+- Removed several 'important' keybinds shown at the bottom of anime list view as it was too crowded
+
 ## [0.3.0] - 2025-05-11
 
 ### Added

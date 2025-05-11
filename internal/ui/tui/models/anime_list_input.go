@@ -332,7 +332,6 @@ func (m *AnimeListModel) handleChooseEpisode(anime *domain.Anime) tea.Cmd {
 }
 
 func (m *AnimeListModel) showMenu() tea.Cmd {
-	// Create a sample menu with various options
 	menuItems := []MenuItem{
 		{
 			Text:        "Anime options",
