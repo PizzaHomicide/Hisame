@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## 0.4.0 - 2025-12-20
+
 ### Changed
 - Deprecated 'path' player config property (but it still works for now)
 - Added new 'command' player config property that takes precedence over 'path' if set.  The 'command' is more general and allows users to build up a larger command that will be given the episode URL to play.  This gives users the power to solve more player related issues on their own.
