@@ -37,19 +37,17 @@ func (p *MPVPlayer) Play(ctx context.Context, url string, title string) (<-chan 
 	// Create notification channel for playback events
 	events := make(chan PlaybackEvent, 10)
 
-	// Get MPV binary path from config
-	mpvPath := p.config.Player.Path
-	if mpvPath == "" {
-		mpvPath = "mpv"
-	}
+	executable, prefixArgs := p.getPlayerCommand()
+	log.Debug("Player command", "executable", executable, "prefix_args", prefixArgs)
 
-	// Build the arguments
-	args := []string{
+	// Specify title if one is supplie	// Build the arguments
+	args := prefixArgs // Start with any prefix args (e.g., flatpak run io.mpv.Mpv)
+	args = append(args,
 		"--no-terminal",                      // Disable terminal control
 		"--keep-open=no",                     // Exit when playback is complete
 		"--input-ipc-server=" + p.socketPath, // Set IPC socket path
-	}
-	// Specify title if one is supplied
+	)
+
 	if title != "" {
 		args = append(args, "--title="+title)
 	}
@@ -64,7 +62,7 @@ func (p *MPVPlayer) Play(ctx context.Context, url string, title string) (<-chan 
 	args = append(args, url)
 
 	// Create command
-	cmd := exec.Command(mpvPath, args...)
+	cmd := exec.Command(executable, args...)
 
 	// Platform-specific process setup
 	setupPlayerProcess(cmd)
@@ -233,4 +231,31 @@ func (p *MPVPlayer) Cleanup() {
 			log.Warn("Failed to remove MPV socket file", "path", p.socketPath, "error", err)
 		}
 	}
+}
+
+// getPlayerCommand returns the executable and prefix args for the player
+func (p *MPVPlayer) getPlayerCommand() (string, []string) {
+	// Use Command if set
+	commandStr := p.config.Player.Command
+	
+	// Fall back to Path if Command is not set (backwards compatibility)
+	if commandStr == "" {
+		commandStr = p.config.Player.Path
+	}
+	
+	// Final fallback to "mpv"
+	if commandStr == "" {
+		commandStr = "mpv"
+	}
+	
+	// Parse the command which might be "flatpak run io.mpv.Mpv" or just "mpv"
+	commandParts := ParseArgs(commandStr)
+	if len(commandParts) == 0 {
+		return "mpv", nil
+	}
+	
+	executable := commandParts[0]
+	prefixArgs := commandParts[1:] // e.g., ["run", "io.mpv.Mpv"] for flatpak
+	
+	return executable, prefixArgs
 }

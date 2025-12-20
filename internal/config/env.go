@@ -28,10 +28,15 @@ var supportedEnvVars = []envVar{
 		desc:  "Sets the video player type.  Should be one of `mpv` or `custom`.  Default: mpv",
 		apply: func(c *Config, s string) { c.Player.Type = s },
 	},
-	{
+		{
 		name:  "HISAME_CONFIG_PLAYER_PATH",
-		desc:  "Sets the path to a video player binary.  Default: mpv",
+		desc:  "Sets the path to a video player binary. Deprecated: use HISAME_CONFIG_PLAYER_COMMAND instead. Default: mpv",
 		apply: func(c *Config, s string) { c.Player.Path = s },
+	},
+	{
+		name:  "HISAME_CONFIG_PLAYER_COMMAND",
+		desc:  "Sets the full player command including any prefix (e.g., 'flatpak run io.mpv.Mpv'). Default: mpv",
+		apply: func(c *Config, s string) { c.Player.Command = s },
 	},
 	{
 		name:  "HISAME_CONFIG_PLAYER_ARGS",

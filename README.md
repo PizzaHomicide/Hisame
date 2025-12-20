@@ -45,6 +45,9 @@ Hisame requires [MPV](https://mpv.io/) for media playback and automatic progress
   
   # Arch Linux
   sudo pacman -S mpv
+
+  # Flatpak (see configuration note below)
+  flatpak install io.mpv.Mpv
   ```
 
 ## Configuration
@@ -64,7 +67,8 @@ auth:
   token: ""        # AniList authentication token (managed by Hisame)
 player:
   type: "mpv"      # Player type (mpv or custom)
-  path: "mpv"      # Path to media player executable
+  command: "mpv"   # Command to run to start the media player.
+  path: "mpv"      # Path to media player executable (DEPRECATED:  Use command instead)
   args: ""         # Additional arguments to pass to the player
   translation_type: "sub"  # Preferred translation type (sub or dub)
 logging:
@@ -86,8 +90,26 @@ If MPV is not in your system PATH, you need to specify the full path to the MPV 
 
 ```yaml
 player:
-  path: "/full/path/to/mpv"  # Replace with the actual path to MPV
+  command: "flatpak run io.mpv.Mpv"  # For Flatpak MPV
+  # OR
+  command: "firejail mpv"  # For Firejail
+  # OR
+  command: "distrobox enter my-container -- mpv"  # For Distrobox
 ```
+
+### Using the MPV flatpak
+Due to the sandboxing of flatpak, the MPV integration may not work properly.  Hisame may be unable to know an episode has started playback
+and be unable to track progress through an episode, meaning it will not auto update progress.
+
+A workaround for this is to add a filesystem permission to the `command` to give it access to the path of the MPV IPC socket.  Check the logs
+to determine what this path is.  For example:
+```yaml
+  command: "flatpak run --filesystem=/run/user/1000 io.mpv.Mpv"
+```
+where the path given to the filesystem flag is the _directory_ the socket is created in.
+```
+```
+
 
 ### Environment Variable Overrides
 

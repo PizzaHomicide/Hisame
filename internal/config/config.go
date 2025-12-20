@@ -26,7 +26,8 @@ type AuthConfig struct {
 // PlayerConfig contains media player settings
 type PlayerConfig struct {
 	Type            string `yaml:"type,omitempty"` // "mpv", "custom"
-	Path            string `yaml:"path,omitempty"`
+	Command         string `yaml:"command,omitempty"` // Full command with any prefix (e.g., "flatpak run io.mpv.Mpv")
+	Path            string `yaml:"path,omitempty"` // Deprecated:  use Command instead
 	Args            string `yaml:"args,omitempty"`
 	TranslationType string `yaml:"translation_type,omitempty"` // "sub", "dub"
 }
@@ -158,6 +159,7 @@ func createBaseDefaultConfig() *Config {
 		Auth: AuthConfig{},
 		Player: PlayerConfig{
 			Type:            "mpv",
+			Command:         "mpv",
 			Path:            "mpv",
 			TranslationType: "sub",
 		},

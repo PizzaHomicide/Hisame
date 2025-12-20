@@ -70,6 +70,8 @@ func GetMPVSocketPath() string {
 			socketPath = "/tmp/mpv-socket"
 		}
 	}
+	
+	log.Info("Determined IPC socket path", "socket_path", socketPath)
 
 	return socketPath
 }
