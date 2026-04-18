@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## 0.4.1 - 2026-04-18
+
+### Fixed
+- Fixed AllAnime API episode source retrieval by implementing AES-256-CTR decryption for the new encrypted "tobeparsed" field format
+
+### Changed
+- Added project maintenance notice to README: project is no longer actively developed, bug fixes will use AI agents with minimal effort
+
 ## 0.4.0 - 2025-12-20
 
 ### Changed
