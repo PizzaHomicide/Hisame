@@ -1,5 +1,13 @@
 # Hisame (氷雨)
 
+> ⚠️ **PROJECT STATUS: NOT ACTIVELY MAINTAINED** ⚠️
+> 
+> This project is **no longer being actively developed**. While it still works and is used by the maintainer, new features will not be added.
+> 
+> **Bug fixes and issues will be addressed with minimal effort**, primarily using AI agents (like OpenCode, Claude, etc.) to provide quick patches when critical functionality breaks. Complex issues or feature requests will likely not be addressed.
+
+---
+
 Hisame is a terminal-based AniList client that helps you manage your anime list and watch episodes directly from the terminal.
 
 > **Note:** Hisame is currently in alpha. Expect bugs and changes as development continues.

@@ -2,6 +2,12 @@ package player
 
 import (
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"github.com/PizzaHomicide/hisame/internal/log"
 	"net/http"
@@ -211,13 +217,103 @@ func (c *AllAnimeClient) GetEpisodeSources(ctx context.Context, showID string, e
 	log.Debug("Fetching episode sources", "showId", showID, "episodeNum", episodeNum, "translationType", translationType)
 
 	// Execute the request
-	var response EpisodeSourceResponse
+	var response map[string]interface{}
 	if err := c.client.Run(ctx, req, &response); err != nil {
 		log.Error("Error fetching episode sources", "error", err)
 		return nil, fmt.Errorf("error fetching episode sources: %w", err)
 	}
 
-	sources := response.Episode.SourceUrls
+	// Check if the response contains a tobeparsed field (encrypted response)
+	if tobeparsed, ok := response["tobeparsed"].(string); ok && tobeparsed != "" {
+		// Decrypt the tobeparsed data
+		decrypted, err := c.decryptTobeparsed(tobeparsed)
+		if err != nil {
+			return nil, fmt.Errorf("error decrypting tobeparsed data: %w", err)
+		}
+
+		// Parse the decrypted JSON to get sources
+		var decryptedResponse EpisodeSourceResponse
+		if err := json.Unmarshal([]byte(decrypted), &decryptedResponse); err != nil {
+			return nil, fmt.Errorf("error parsing decrypted response: %w", err)
+		}
+
+		sources := decryptedResponse.Episode.SourceUrls
+		log.Debug("Episode sources retrieved successfully (decrypted)", "count", len(sources))
+		return sources, nil
+	}
+
+	// Process normal response
+	var normalResponse EpisodeSourceResponse
+	if err := mapToStruct(response, &normalResponse); err != nil {
+		return nil, fmt.Errorf("error parsing normal response: %w", err)
+	}
+
+	sources := normalResponse.Episode.SourceUrls
 	log.Debug("Episode sources retrieved successfully", "count", len(sources))
 	return sources, nil
+}
+
+// decryptTobeparsed decrypts the AES-256-CTR encrypted tobeparsed field
+// This replicates the OpenSSL decryption logic from ani-cli:
+// 1. Key = SHA256("SimtVuagFbGR2K7P") as hex string, then decoded
+// 2. IV = 12 bytes from data + "00000002" as hex, then decoded to 16 bytes
+func (c *AllAnimeClient) decryptTobeparsed(tobeparsed string) (string, error) {
+	// Decode base64
+	encryptedData, err := base64.StdEncoding.DecodeString(tobeparsed)
+	if err != nil {
+		return "", fmt.Errorf("failed to base64 decode: %w", err)
+	}
+
+	// Extract IV (first 12 bytes) and ciphertext
+	// The last 16 bytes appear to be padding/auth tag that we should skip
+	if len(encryptedData) < 28 { // 12 IV + at least 1 ciphertext + 15 padding minimum
+		return "", fmt.Errorf("encrypted data too short: %d bytes", len(encryptedData))
+	}
+
+	// Extract 12-byte IV
+	ivBytes := encryptedData[:12]
+	// Ciphertext is everything between IV and the last 16 bytes
+	ciphertext := encryptedData[12 : len(encryptedData)-16]
+
+	// Generate key: SHA256(secret) as hex string, then decode to bytes
+	// This matches: printf '%s' 'SimtVuagFbGR2K7P' | openssl dgst -sha256 -binary | od -A n -t x1 | tr -d ' \n'
+	keyHash := sha256.Sum256([]byte("SimtVuagFbGR2K7P"))
+	keyHex := hex.EncodeToString(keyHash[:]) // 64-character hex string
+	key, err := hex.DecodeString(keyHex)
+	if err != nil {
+		return "", fmt.Errorf("failed to decode key hex: %w", err)
+	}
+
+	// Build the counter IV: IV bytes as hex + "00000002", then decode to 16 bytes
+	// This matches: ctr="${iv}00000002" in ani-cli
+	ivHex := hex.EncodeToString(ivBytes) // 24-character hex string (12 bytes)
+	ctrHex := ivHex + "00000002"         // Append 8 hex characters (4 bytes: 0x00,0x00,0x00,0x02)
+	ctr, err := hex.DecodeString(ctrHex)
+	if err != nil {
+		return "", fmt.Errorf("failed to decode counter hex: %w", err)
+	}
+
+	// Create AES cipher with the key
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return "", fmt.Errorf("failed to create AES cipher: %w", err)
+	}
+
+	// Create CTR mode stream with the counter
+	stream := cipher.NewCTR(block, ctr)
+
+	// Decrypt
+	plaintext := make([]byte, len(ciphertext))
+	stream.XORKeyStream(plaintext, ciphertext)
+
+	return string(plaintext), nil
+}
+
+// mapToStruct converts a map to a struct using JSON marshaling/unmarshaling
+func mapToStruct(m map[string]interface{}, out interface{}) error {
+	tmp, err := json.Marshal(m)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(tmp, out)
 }
