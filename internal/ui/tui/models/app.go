@@ -265,12 +265,12 @@ func (m *AppModel) handleOrchestrationMsg(msg tea.Msg) tea.Cmd {
 		case EpisodeEventLoaded:
 			if len(msg.Episodes) == 0 {
 				log.Warn("No episodes found for anime", "title", msg.Title)
-				m.disableLoading()
+				m.popLoadingModel()
 				return nil
 			}
 
 			log.Info("Episodes loaded", "count", len(msg.Episodes), "title", msg.Title)
-			m.disableLoading()
+			m.popLoadingModel()
 			return m.PushModel(NewEpisodeSelectModel(msg.Episodes, msg.Title))
 
 		case EpisodeEventSelected:
@@ -292,7 +292,7 @@ func (m *AppModel) handleOrchestrationMsg(msg tea.Msg) tea.Cmd {
 
 		case EpisodeEventError:
 			log.Warn("Could not find episode", "error", msg.Error)
-			m.disableLoading()
+			m.popLoadingModel()
 			return nil
 		}
 
@@ -301,8 +301,14 @@ func (m *AppModel) handleOrchestrationMsg(msg tea.Msg) tea.Cmd {
 		switch msg.Type {
 		case PlaybackEventStarted, PlaybackEventEnded, PlaybackEventError:
 			// Make sure any loading indicators are disabled in the anime list
-			m.disableLoading()
+			m.popLoadingModel()
 			return nil
+
+		default:
+			// TODO: This is a short-term workaround for the interim work on playback messages
+			return m.withAnimeListModel(func(model *AnimeListModel) (Model, tea.Cmd) {
+				return model.Update(msg)
+			})
 		}
 
 	case AnimeListLoadResultMsg:
@@ -339,6 +345,11 @@ func (m *AppModel) handleOrchestrationMsg(msg tea.Msg) tea.Cmd {
 			}
 			if msg.ActionText != "" {
 				loadingModel = loadingModel.WithActionText(msg.ActionText)
+			}
+
+			if m.CurrentModel().ViewType() == ViewLoading {
+				log.Debug("Already showing loading model, replacing it instead of pushing direct to stack")
+				m.popLoadingModel()
 			}
 
 			log.Debug("Starting loading state", "message", msg.Message)
@@ -519,17 +530,6 @@ func (m *AppModel) getModel(view View) Model {
 
 	// No matching model found
 	return nil
-}
-
-// disableLoading is a temporary helper function to disable the loading screen on the animeListModel
-// It is temporary because this model is to be changed to not have its own baked in loading logic.
-func (m *AppModel) disableLoading() {
-	// Turn off loading in anime list model
-	if model := m.getModel(ViewAnimeList); model != nil {
-		if animeListModel, ok := model.(*AnimeListModel); ok {
-			animeListModel.DisableLoading()
-		}
-	}
 }
 
 // updateCurrentModel sends the input message to the top model on the stack and returns any cmd from it

@@ -4,6 +4,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/PizzaHomicide/hisame/internal/log"
 	"github.com/PizzaHomicide/hisame/internal/ui/tui/styles"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
@@ -71,6 +72,7 @@ func (m *LoadingModel) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m, cmd
 	}
 
+	log.Warn("Loading model received message it can't handle", "message", msg)
 	return m, nil
 }
 

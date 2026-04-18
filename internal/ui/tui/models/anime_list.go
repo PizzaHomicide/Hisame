@@ -37,10 +37,7 @@ type AnimeListModel struct {
 	animeService         *service.AnimeService
 	playerService        *player.PlayerService
 	width, height        int
-	loading              bool
-	loadingMsg           string
 	loadError            error
-	spinner              spinner.Model
 	filters              AnimeFilterSet
 	cursor               int
 	allAnime             []*domain.Anime // All anime from the service
@@ -69,8 +66,6 @@ func NewAnimeListModel(cfg *config.Config, animeService *service.AnimeService) *
 		config:               cfg,
 		animeService:         animeService,
 		playerService:        player.NewPlayerService(cfg),
-		loading:              false,
-		spinner:              s,
 		filters:              defaultFilters,
 		cursor:               0,
 		allAnime:             []*domain.Anime{},
@@ -138,14 +133,6 @@ func (m *AnimeListModel) HandleAnimeListError(err error) (Model, tea.Cmd) {
 
 // View renders the anime list model
 func (m *AnimeListModel) View() string {
-	if m.loading {
-		return styles.CenteredView(
-			m.width,
-			m.height,
-			fmt.Sprintf("%s %s", m.spinner.View(), m.loadingMsg),
-		)
-	}
-
 	if m.loadError != nil {
 		errorMsg := fmt.Sprintf("Error loading anime list: %v\n\nPress 'r' to retry.", m.loadError)
 		return styles.CenteredView(
@@ -191,9 +178,4 @@ func (m *AnimeListModel) getSelectedAnime() *domain.Anime {
 		return nil
 	}
 	return animeList[m.cursor]
-}
-
-// DisableLoading disables the loading state
-func (m *AnimeListModel) DisableLoading() {
-	m.loading = false
 }
